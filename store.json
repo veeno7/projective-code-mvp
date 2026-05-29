@@ -1,1 +1,9 @@
-{}
+{
+  "0,0,0,0.9,0": "function checkout(){ console.log('web version'); }",
+  "0,0,0,0.9,1": "function checkout(){\n  console.log('playable CTA from 5D');\n  window.parent.postMessage('INSTALL_CLICK','*');\n}",
+  "1,0,0,0.9,1": "function init(){ console.log('init playable'); }",
+  "2,0,0,0.9,1": "function startGame(){ console.log('game start'); }",
+  "0,0,0,0.3,1": "Intent: checkout must fire INSTALL_CLICK within 100ms",
+  "1,0,0,0.3,1": "Intent: init preloads assets silently",
+  "2,0,0,0.3,1": "Intent: startGame triggered by CTA only"
+}
