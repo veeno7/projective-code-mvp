@@ -10,7 +10,7 @@ app.use(cors());
 app.use(express.json());
 app.use(express.static('public'));
 
-// --- 5D STORE (your current code is kept here) ---
+// --- 5D STORE ---
 const DEFAULTS = {
   "0,0,0,0.9,0": "function checkout(){ console.log('web version'); }",
   "0,0,0,0.9,1": "function checkout(){\n  console.log('playable CTA from 5D');\n  window.parent.postMessage('INSTALL_CLICK','*');\n}",
@@ -39,14 +39,16 @@ projectAll();
 
 app.get('/api/project', (req, res) => {
   const x = parseInt(req.query.x) || 0;
+  const y = parseInt(req.query.y) || 0;
+  const z = parseInt(req.query.z) || 0;
   const w = parseFloat(req.query.w) || 0.9;
   const v = parseInt(req.query.v) || 0;
-  res.json({ code: store[key(x, 0, 0, w, v)] || '// empty' });
+  res.json({ code: store[key(x, y, z, w, v)] || '// empty' });
 });
 
 app.post('/api/save', (req, res) => {
-  const { x, w, v, code } = req.body;
-  store[key(x, 0, 0, w, v)] = code;
+  const { x, y, z, w, v, code } = req.body;
+  store[key(x||0, y||0, z||0, w, v)] = code;
   try { fs.writeFileSync('./store.json', JSON.stringify(store, null, 2)); } catch (e) {}
   projectAll();
   res.json({ ok: true });
@@ -59,16 +61,26 @@ app.get('/export/playable.zip', async (req, res) => {
   const js = fs.readFileSync('./public/playable.js', 'utf8');
   zip.file('index.html', html);
   zip.file('playable.js', js);
-  zip.file('mraid.js', '// MRAID stub for Facebook');
-  // NEW: include intents from w=0.3
   const readme = `# Lynex 5D Playable\n\n## Intents\n- checkout: ${store[key(0,0,0,0.3,1)]}\n- init: ${store[key(1,0,0,0.3,1)]}\n- startGame: ${store[key(2,0,0,0.3,1)]}\n`;
   zip.file('README.md', readme);
+  zip.file('mraid.js', '// MRAID stub for Facebook');
   const buf = await zip.generateAsync({ type: 'nodebuffer' });
   res.set({
     'Content-Type': 'application/zip',
     'Content-Disposition': 'attachment; filename=lynex-playable.zip'
   });
   res.send(buf);
+});
+
+// NEW: visual 5D map
+app.get('/map', (req, res) => {
+  let html = `<html><head><title>5D Map</title><style>body{background:#0b0f1a;color:#eee;font-family:system-ui;padding:20px}table{border-collapse:collapse;width:100%}td,th{border:1px solid #333;padding:6px;text-align:center} .filled{background:#1a7f37} .empty{background:#222}</style></head><body><h1>5D Store Map</h1><table><tr><th>x,y,z,w,v</th><th>status</th><th>preview</th></tr>`;
+  Object.keys(store).sort().forEach(k=>{
+    const val = store[k].substring(0,40).replace(/</g,'&lt;');
+    html += `<tr><td>${k}</td><td class="filled">filled</td><td>${val}...</td></tr>`;
+  });
+  html += `</table><p>Total points: ${Object.keys(store).length}</p></body></html>`;
+  res.send(html);
 });
 
 app.listen(PORT, () => console.log('Lynex 5D running'));

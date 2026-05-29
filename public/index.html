@@ -11,6 +11,7 @@ textarea{width:100%;height:140px;background:#000;color:#0f0;border:1px solid #33
 button{background:#7c5cff;border:0;padding:8px 14px;border-radius:8px;font-weight:600;color:#fff;cursor:pointer}
 select,input{width:100%;padding:6px;background:#000;color:#fff;border:1px solid #333;margin-top:4px}
 pre{white-space:pre-wrap;background:#000;padding:8px;border-radius:6px}
+.row{display:grid;grid-template-columns:1fr 1fr;gap:8px}
 </style>
 </head>
 <body>
@@ -22,6 +23,10 @@ pre{white-space:pre-wrap;background:#000;padding:8px;border-radius:6px}
     <option value="1">1: init</option>
     <option value="2">2: startGame</option>
   </select>
+  <div class="row" style="margin-top:8px">
+    <div>y (version): <select id="y"><option>0</option><option>1</option><option>2</option></select></div>
+    <div>z (variant): <select id="z"><option>0</option><option>1</option></select></div>
+  </div>
   <div style="margin-top:8px">w (abstraction): <span id="wv">0.9</span><input id="w" type="range" min="0.3" max="0.9" step="0.3" value="0.9"></div>
   <div>v (context): <span id="vv">1</span><input id="v" type="range" min="0" max="1" step="1" value="1"></div>
 </div>
@@ -29,16 +34,17 @@ pre{white-space:pre-wrap;background:#000;padding:8px;border-radius:6px}
   <textarea id="ed"></textarea><br>
   <button id="save">Save to 5D</button>
   <a href="/export/playable.zip" style="margin-left:8px"><button>Export ZIP</button></a>
+  <a href="/map" style="margin-left:8px"><button>5D Map</button></a>
 </div>
 <div class="card">
   <pre id="out"></pre>
   <button id="run">Run</button>
 </div>
 <script>
-const fn=document.getElementById('fn'),w=document.getElementById('w'),v=document.getElementById('v'),ed=document.getElementById('ed'),out=document.getElementById('out'),wv=document.getElementById('wv'),vv=document.getElementById('vv');
-async function proj(){wv.textContent=w.value;vv.textContent=v.value;const r=await fetch(`/api/project?x=${fn.value}&w=${w.value}&v=${v.value}`);const d=await r.json();ed.value=out.textContent=d.code;}
-async function save(){await fetch('/api/save',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({x:+fn.value,w:+w.value,v:+v.value,code:ed.value})});proj();}
-document.getElementById('save').onclick=save;document.getElementById('run').onclick=()=>eval(out.textContent);fn.onchange=w.oninput=v.oninput=proj;proj();
+const fn=document.getElementById('fn'),y=document.getElementById('y'),z=document.getElementById('z'),w=document.getElementById('w'),v=document.getElementById('v'),ed=document.getElementById('ed'),out=document.getElementById('out'),wv=document.getElementById('wv'),vv=document.getElementById('vv');
+async function proj(){wv.textContent=w.value;vv.textContent=v.value;const r=await fetch(`/api/project?x=${fn.value}&y=${y.value}&z=${z.value}&w=${w.value}&v=${v.value}`);const d=await r.json();ed.value=out.textContent=d.code;}
+async function save(){await fetch('/api/save',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({x:+fn.value,y:+y.value,z:+z.value,w:+w.value,v:+v.value,code:ed.value})});proj();}
+document.getElementById('save').onclick=save;document.getElementById('run').onclick=()=>eval(out.textContent);fn.onchange=y.onchange=z.onchange=w.oninput=v.oninput=proj;proj();
 </script>
 </body>
 </html>
