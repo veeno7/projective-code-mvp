@@ -1,23 +1,24 @@
-<!DOCTYPE html><html><head><meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
+<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>5D Editor</title>
 <style>body{font-family:system-ui;background:#0b0f1a;color:#eee;margin:0;padding:20px}
 .card{background:#151b2c;padding:16px;border-radius:12px;margin:12px 0}
-textarea{width:100%;height:120px;background:#000;color:#0f0;border:1px solid #333;font-family:monospace}
-button{background:#7c5cff;border:0;padding:8px 14px;border-radius:8px;font-weight:600}
-input{width:100%}</style></head><body>
+textarea{width:100%;height:140px;background:#000;color:#0f0;border:1px solid #333;font-family:monospace}
+button{background:#7c5cff;border:0;padding:8px 14px;border-radius:8px;font-weight:600;color:#fff}
+select,input{width:100%;padding:6px;background:#000;color:#fff;border:1px solid #333;margin-top:4px}</style>
+</head><body>
 <h1>5D → 4D → 2D</h1>
 <div class="card">
-  w (abstraction): <span id="wv">0.9</span><input id="w" type="range" min="0" max="1" step="0.1" value="0.9">
-  v (context): <span id="vv">0</span><input id="v" type="range" min="0" max="1" step="1" value="0">
+  Function (x):
+  <select id="fn"><option value="0">0: checkout</option><option value="1">1: init</option><option value="2">2: startGame</option></select>
+  <div style="margin-top:8px">w (abstraction): <span id="wv">0.9</span><input id="w" type="range" min="0" max="1" step="0.6" value="0.9"></div>
+  <div>v (context): <span id="vv">1</span><input id="v" type="range" min="0" max="1" step="1" value="1"></div>
 </div>
 <div class="card"><textarea id="ed"></textarea><br><button id="save">Save to 5D</button></div>
-<div class="card"><pre id="out"></pre><button id="run">Run</button></div>
+<div class="card"><pre id="out" style="white-space:pre-wrap"></pre><button id="run">Run</button></div>
 <script>
-const w=document.getElementById('w'),v=document.getElementById('v'),ed=document.getElementById('ed'),out=document.getElementById('out');
-async function proj(){document.getElementById('wv').textContent=w.value;document.getElementById('vv').textContent=v.value;
- const r=await fetch(`/api/project?w=${w.value}&v=${v.value}`);const d=await r.json();out.textContent=ed.value=d.code;}
-async function save(){await fetch('/api/save',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({w:+w.value,v:+v.value,code:ed.value})});proj();}
-document.getElementById('save').onclick=save;document.getElementById('run').onclick=()=>eval(out.textContent);
-w.oninput=v.oninput=proj;proj();
+const fn=document.getElementById('fn'),w=document.getElementById('w'),v=document.getElementById('v'),ed=document.getElementById('ed'),out=document.getElementById('out');
+async function proj(){wv.textContent=w.value;vv.textContent=v.value;
+ const r=await fetch(`/api/project?x=${fn.value}&w=${w.value}&v=${v.value}`);const d=await r.json();ed.value=out.textContent=d.code;}
+async function save(){await fetch('/api/save',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({x:+fn.value,w:+w.value,v:+v.value,code:ed.value})});proj();}
+save.onclick=save;run.onclick=()=>eval(out.textContent);fn.onchange=w.oninput=v.oninput=proj;proj();
 </script></body></html>
