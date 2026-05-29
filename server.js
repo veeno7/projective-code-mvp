@@ -104,4 +104,13 @@ app.get('/map', (req, res) => {
   res.send(html);
 });
 
+// NEW: AI projector
+app.post('/api/generate', (req, res) => {
+  const { x, intent } = req.body;
+  const names = ['checkout','init','startGame'];
+  const fn = names[x] || 'fn';
+  const code = `function ${fn}(){\n  // Intent: ${intent}\n  console.log('${String(intent).replace(/'/g,"\\'")}');\n  ${fn==='checkout'?"window.parent.postMessage('INSTALL_CLICK','*');":''}\n}`;
+  res.json({ code });
+});
+
 app.listen(PORT, () => console.log('Lynex 5D running'));
