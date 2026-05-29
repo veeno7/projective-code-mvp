@@ -1,6 +1,6 @@
 {
   "0,0,0,0.9,0": "function checkout(){ console.log('web version'); }",
-  "0,0,0,0.9,1": "function checkout(){\n  // Intent: make me an hello \n  console.log('make me an hello ');\n  window.parent.postMessage('INSTALL_CLICK','*');\n}",
+  "0,0,0,0.9,1": "function checkout() { setTimeout(() => { window.parent.postMessage('INSTALL_CLICK', '*'); }, 100); }",
   "1,0,0,0.9,1": "function init(){ console.log('init playable'); }",
   "2,0,0,0.9,1": "function startGame(){ console.log('game start'); }",
   "0,0,0,0.3,1": "Intent: checkout must fire INSTALL_CLICK within 100ms",
