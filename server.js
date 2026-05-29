@@ -2,9 +2,14 @@ const express = require('express');
 const cors = require('cors');
 const fs = require('fs');
 const JSZip = require('jszip');
+const { Octokit } = require('@octokit/rest');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+const GITHUB_TOKEN = process.env.GITHUB_TOKEN;
+const octokit = GITHUB_TOKEN ? new Octokit({ auth: GITHUB_TOKEN }) : null;
+const REPO_OWNER = 'veeno7';
+const REPO_NAME = 'projective-code-mvp';
 
 app.use(cors());
 app.use(express.json());
@@ -37,6 +42,22 @@ function projectAll() {
 }
 projectAll();
 
+async function commitToGitHub() {
+  if (!octokit) return;
+  try {
+    const content = Buffer.from(JSON.stringify(store, null, 2)).toString('base64');
+    const { data: file } = await octokit.repos.getContent({ owner: REPO_OWNER, repo: REPO_NAME, path: 'store.json' }).catch(()=>({data:{sha:null}}));
+    await octokit.repos.createOrUpdateFileContents({
+      owner: REPO_OWNER,
+      repo: REPO_NAME,
+      path: 'store.json',
+      message: `5D save ${new Date().toISOString()}`,
+      content,
+      sha: file.sha || undefined
+    });
+  } catch(e){ console.log('GitHub commit failed', e.message); }
+}
+
 app.get('/api/project', (req, res) => {
   const x = parseInt(req.query.x) || 0;
   const y = parseInt(req.query.y) || 0;
@@ -46,11 +67,12 @@ app.get('/api/project', (req, res) => {
   res.json({ code: store[key(x, y, z, w, v)] || '// empty' });
 });
 
-app.post('/api/save', (req, res) => {
+app.post('/api/save', async (req, res) => {
   const { x, y, z, w, v, code } = req.body;
   store[key(x||0, y||0, z||0, w, v)] = code;
   try { fs.writeFileSync('./store.json', JSON.stringify(store, null, 2)); } catch (e) {}
   projectAll();
+  await commitToGitHub();
   res.json({ ok: true });
 });
 
@@ -72,14 +94,13 @@ app.get('/export/playable.zip', async (req, res) => {
   res.send(buf);
 });
 
-// NEW: visual 5D map
 app.get('/map', (req, res) => {
-  let html = `<html><head><title>5D Map</title><style>body{background:#0b0f1a;color:#eee;font-family:system-ui;padding:20px}table{border-collapse:collapse;width:100%}td,th{border:1px solid #333;padding:6px;text-align:center} .filled{background:#1a7f37} .empty{background:#222}</style></head><body><h1>5D Store Map</h1><table><tr><th>x,y,z,w,v</th><th>status</th><th>preview</th></tr>`;
+  let html = `<html><head><title>5D Map</title><style>body{background:#0b0f1a;color:#eee;font-family:system-ui;padding:20px}table{border-collapse:collapse;width:100%}td,th{border:1px solid #333;padding:6px;text-align:center} .filled{background:#1a7f37}</style></head><body><h1>5D Store Map</h1><table><tr><th>coordinate</th><th>preview</th></tr>`;
   Object.keys(store).sort().forEach(k=>{
     const val = store[k].substring(0,40).replace(/</g,'&lt;');
-    html += `<tr><td>${k}</td><td class="filled">filled</td><td>${val}...</td></tr>`;
+    html += `<tr><td>${k}</td><td class="filled">${val}...</td></tr>`;
   });
-  html += `</table><p>Total points: ${Object.keys(store).length}</p></body></html>`;
+  html += `</table></body></html>`;
   res.send(html);
 });
 
