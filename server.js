@@ -104,40 +104,55 @@ app.get('/map', (req, res) => {
   res.send(html);
 });
 
-// REAL LLM PROJECTOR
+// REAL LLM PROJECTOR - with diagnostics
 app.post('/api/generate', async (req, res) => {
   const { x, intent } = req.body;
   const names = ['checkout','init','startGame'];
   const fn = names[x] || 'fn';
-
   const OPENAI_KEY = process.env.OPENAI_API_KEY;
 
+  console.log('[5D] Generate:', { fn, intent, hasKey: !!OPENAI_KEY });
+
   if (!OPENAI_KEY) {
-    const code = `function ${fn}(){\n  // Intent: ${intent}\n  console.log('${String(intent).replace(/'/g,"\\'")}');\n  ${fn==='checkout'?"window.parent.postMessage('INSTALL_CLICK','*');":''}\n}`;
+    console.log('[5D] Missing OPENAI_API_KEY - fallback');
+    const code = `function ${fn}(){\n  // Intent: ${intent}\n  console.log('${String(intent).replace(/'/g,"\\'")}');\n  ${fn==='checkout'?"setTimeout(()=>window.parent.postMessage('INSTALL_CLICK','*'),100);":''}\n}`;
     return res.json({ code });
   }
 
   try {
-    const prompt = `You are a 5D code projector. Write ONLY the JavaScript function for function ${fn}(). Intent: "${intent}". Rules: Facebook playable ad, must ${fn==='checkout'?"call window.parent.postMessage('INSTALL_CLICK','*') within 100ms":"be under 15 lines"}, no comments except the intent, no markdown.`;
+    const prompt = `You are a 5D code projector. Output ONLY raw JavaScript for function ${fn}(). Intent: "${intent}". Platform: Facebook playable. ${fn==='checkout'?'Must call window.parent.postMessage("INSTALL_CLICK","*") within 100ms.':''} No markdown, no explanation.`;
 
     const r = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: { 'Authorization': `Bearer ${OPENAI_KEY}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({
         model: 'gpt-4o-mini',
-        messages: [{role:'user', content: prompt}],
+        messages: [
+          {role:'system', content:'You write only JavaScript code, no prose.'},
+          {role:'user', content: prompt}
+        ],
         temperature: 0.2,
-        max_tokens: 400
+        max_tokens: 600
       })
     });
+
+    if (!r.ok) {
+      const err = await r.text();
+      console.log('[5D] OpenAI error', r.status, err);
+      throw new Error(err);
+    }
+
     const data = await r.json();
     let code = data.choices?.[0]?.message?.content || '';
     code = code.replace(/```javascript|```js|```/g,'').trim();
     if (!code.startsWith('function')) code = `function ${fn}(){\n${code}\n}`;
+
+    console.log('[5D] LLM ok, bytes:', code.length);
     res.json({ code });
+
   } catch(e) {
-    console.log('LLM failed', e.message);
-    res.json({ code: `function ${fn}(){ console.log('LLM error'); }` });
+    console.log('[5D] LLM failed:', e.message);
+    res.json({ code: `function ${fn}(){ console.log('LLM error: ${e.message.replace(/'/g,"")}'); }` });
   }
 });
 
