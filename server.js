@@ -15,7 +15,10 @@ const DEFAULTS = {
   "0,0,0,0.9,0": "function checkout(){ console.log('web version'); }",
   "0,0,0,0.9,1": "function checkout(){\n  console.log('playable CTA from 5D');\n  window.parent.postMessage('INSTALL_CLICK','*');\n}",
   "1,0,0,0.9,1": "function init(){ console.log('init playable'); }",
-  "2,0,0,0.9,1": "function startGame(){ console.log('game start'); }"
+  "2,0,0,0.9,1": "function startGame(){ console.log('game start'); }",
+  "0,0,0,0.3,1": "Intent: checkout must fire INSTALL_CLICK within 100ms",
+  "1,0,0,0.3,1": "Intent: init preloads assets silently",
+  "2,0,0,0.3,1": "Intent: startGame triggered by CTA only"
 };
 
 let store = { ...DEFAULTS };
@@ -57,6 +60,9 @@ app.get('/export/playable.zip', async (req, res) => {
   zip.file('index.html', html);
   zip.file('playable.js', js);
   zip.file('mraid.js', '// MRAID stub for Facebook');
+  // NEW: include intents from w=0.3
+  const readme = `# Lynex 5D Playable\n\n## Intents\n- checkout: ${store[key(0,0,0,0.3,1)]}\n- init: ${store[key(1,0,0,0.3,1)]}\n- startGame: ${store[key(2,0,0,0.3,1)]}\n`;
+  zip.file('README.md', readme);
   const buf = await zip.generateAsync({ type: 'nodebuffer' });
   res.set({
     'Content-Type': 'application/zip',
