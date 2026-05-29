@@ -1,6 +1,11 @@
-<!DOCTYPE html><html><head><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Lynex Playable Demo</title></head><body style="margin:0;background:#000;color:#fff;font-family:system-ui;display:grid;place-items:center;height:100vh">
-  <div>
+<!DOCTYPE html>
+<html>
+<head>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Lynex Playable Demo</title>
+</head>
+<body style="margin:0;background:#000;color:#fff;font-family:system-ui;display:grid;place-items:center;height:100vh">
+  <div style="text-align:center">
     <h1>Tap to Install</h1>
     <button id="cta" style="padding:16px 28px;font-size:18px;background:#7c5cff;border:0;border-radius:12px;color:white">Play Now</button>
   </div>
@@ -8,9 +13,9 @@
 <script>
 document.getElementById('cta').onclick = () => {
   if (typeof checkout === 'function') checkout();
-  // real playable SDK call would go here:
-  // FbPlayableAd.onCTAClick();
-  alert('CTA fired from 5D code!');
+  if (typeof startGame === 'function') startGame();
+  alert('CTA fired from 5D!');
 };
 </script>
-</body></html>
+</body>
+</html>
