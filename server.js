@@ -7,7 +7,7 @@ const { Octokit } = require('@octokit/rest');
 const app = express();
 const PORT = process.env.PORT || 3000;
 const GITHUB_TOKEN = process.env.GITHUB_TOKEN;
-const octokit = GITHUB_TOKEN ? new Octokit({ auth: GITHUB_TOKEN }) : null;
+const octokit = GITHUB_TOKEN? new Octokit({ auth: GITHUB_TOKEN }) : null;
 const REPO_OWNER = 'veeno7';
 const REPO_NAME = 'projective-code-mvp';
 
@@ -18,7 +18,7 @@ app.use(express.static('public'));
 // --- 5D STORE ---
 const DEFAULTS = {
   "0,0,0,0.9,0": "function checkout(){ console.log('web version'); }",
-  "0,0,0,0.9,1": "function checkout(){\n  console.log('playable CTA from 5D');\n  window.parent.postMessage('INSTALL_CLICK','*');\n}",
+  "0,0,0,0.9,1": "function checkout(){\n console.log('playable CTA from 5D');\n window.parent.postMessage('INSTALL_CLICK','*');\n}",
   "1,0,0,0.9,1": "function init(){ console.log('init playable'); }",
   "2,0,0,0.9,1": "function startGame(){ console.log('game start'); }",
   "0,0,0,0.3,1": "Intent: checkout must fire INSTALL_CLICK within 100ms",
@@ -26,10 +26,10 @@ const DEFAULTS = {
   "2,0,0,0.3,1": "Intent: startGame triggered by CTA only"
 };
 
-let store = { ...DEFAULTS };
+let store = {...DEFAULTS };
 try {
   const saved = JSON.parse(fs.readFileSync('./store.json', 'utf8'));
-  store = { ...store, ...saved };
+  store = {...store,...saved };
 } catch (e) {}
 
 const key = (x, y, z, w, v) => `${x},${y},${z},${w},${v}`;
@@ -95,7 +95,7 @@ app.get('/export/playable.zip', async (req, res) => {
 });
 
 app.get('/map', (req, res) => {
-  let html = `<html><head><title>5D Map</title><style>body{background:#0b0f1a;color:#eee;font-family:system-ui;padding:20px}table{border-collapse:collapse;width:100%}td,th{border:1px solid #333;padding:6px;text-align:center} .filled{background:#1a7f37}</style></head><body><h1>5D Store Map</h1><table><tr><th>coordinate</th><th>preview</th></tr>`;
+  let html = `<html><head><title>5D Map</title><style>body{background:#0b0f1a;color:#eee;font-family:system-ui;padding:20px}table{border-collapse:collapse;width:100%}td,th{border:1px solid #333;padding:6px;text-align:center}.filled{background:#1a7f37}</style></head><body><h1>5D Store Map</h1><table><tr><th>coordinate</th><th>preview</th></tr>`;
   Object.keys(store).sort().forEach(k=>{
     const val = store[k].substring(0,40).replace(/</g,'&lt;');
     html += `<tr><td>${k}</td><td class="filled">${val}...</td></tr>`;
@@ -104,23 +104,35 @@ app.get('/map', (req, res) => {
   res.send(html);
 });
 
-// REAL LLM PROJECTOR - with diagnostics
+// UPGRADED GAME PROJECTOR
 app.post('/api/generate', async (req, res) => {
   const { x, intent } = req.body;
   const names = ['checkout','init','startGame'];
   const fn = names[x] || 'fn';
   const OPENAI_KEY = process.env.OPENAI_API_KEY;
 
-  console.log('[5D] Generate:', { fn, intent, hasKey: !!OPENAI_KEY });
+  console.log('[5D] Generate:', { fn, intent, hasKey:!!OPENAI_KEY });
 
   if (!OPENAI_KEY) {
-    console.log('[5D] Missing OPENAI_API_KEY - fallback');
-    const code = `function ${fn}(){\n  // Intent: ${intent}\n  console.log('${String(intent).replace(/'/g,"\\'")}');\n  ${fn==='checkout'?"setTimeout(()=>window.parent.postMessage('INSTALL_CLICK','*'),100);":''}\n}`;
+    const code = `function ${fn}(){\n console.log('No API key');\n ${fn==='checkout'?"setTimeout(()=>window.parent.postMessage('INSTALL_CLICK','*'),100);":''}\n}`;
     return res.json({ code });
   }
 
   try {
-    const prompt = `You are a 5D code projector. Output ONLY raw JavaScript for function ${fn}(). Intent: "${intent}". Platform: Facebook playable. ${fn==='checkout'?'Must call window.parent.postMessage("INSTALL_CLICK","*") within 100ms.':''} No markdown, no explanation.`;
+    const systemPrompt = `You are a 5D code projector for Facebook playable ads. Write ONLY raw JavaScript - no markdown, no explanations.
+
+RULES:
+- Function name must be exactly: ${fn}
+- For checkout(): MUST call window.parent.postMessage("INSTALL_CLICK","*") within 100ms of visual effect ending
+- For init(): setup canvas, preload, create game objects
+- For startGame(): create full game loop with requestAnimationFrame
+- Use vanilla JS only, create canvas dynamically if needed
+- Add real visuals: particles, tweens, physics matching the intent
+- Max 50 lines, must be runnable immediately`;
+
+    const userPrompt = `Intent: "${intent}"
+
+Generate complete ${fn}() that implements this as a real playable effect. If intent mentions confetti, explosion, bounce, etc., code the actual animation. Return ONLY the function code.`;
 
     const r = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
@@ -128,11 +140,11 @@ app.post('/api/generate', async (req, res) => {
       body: JSON.stringify({
         model: 'gpt-4o-mini',
         messages: [
-          {role:'system', content:'You write only JavaScript code, no prose.'},
-          {role:'user', content: prompt}
+          {role:'system', content: systemPrompt},
+          {role:'user', content: userPrompt}
         ],
-        temperature: 0.2,
-        max_tokens: 600
+        temperature: 0.7,
+        max_tokens: 1200
       })
     });
 
@@ -145,14 +157,16 @@ app.post('/api/generate', async (req, res) => {
     const data = await r.json();
     let code = data.choices?.[0]?.message?.content || '';
     code = code.replace(/```javascript|```js|```/g,'').trim();
-    if (!code.startsWith('function')) code = `function ${fn}(){\n${code}\n}`;
+    if (!code.includes(`function ${fn}`)) {
+      code = `function ${fn}(){\n${code}\n}`;
+    }
 
-    console.log('[5D] LLM ok, bytes:', code.length);
+    console.log('[5D] LLM game code ok, bytes:', code.length);
     res.json({ code });
 
   } catch(e) {
     console.log('[5D] LLM failed:', e.message);
-    res.json({ code: `function ${fn}(){ console.log('LLM error: ${e.message.replace(/'/g,"")}'); }` });
+    res.json({ code: `function ${fn}(){ console.error('Generation failed'); }` });
   }
 });
 
