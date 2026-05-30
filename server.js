@@ -95,7 +95,6 @@ app.post('/api/save', async (req, res) => {
   try { fs.writeFileSync('./store.json', JSON.stringify(store, null, 2)); } catch (e) {}
   projectAll();
   await commitToGitHub();
-  // RETURN UNIQUE PREVIEW LINK
   const version = Date.now();
   res.json({
     ok: true,
@@ -104,7 +103,6 @@ app.post('/api/save', async (req, res) => {
   });
 });
 
-// NEW: UNIQUE SHARE LINKS
 app.get('/p/:v', (req,res)=>{
   res.redirect(`/demo.html?auto=1&v=${req.params.v}`);
 });
@@ -132,7 +130,7 @@ app.get('/map', (req, res) => {
   res.send(html);
 });
 
-// HIGH-END GRAPHICS PROJECTOR
+// HIGH-END GRAPHICS PROJECTOR - NO CHEAT
 app.post('/api/generate', async (req, res) => {
   const { x, intent } = req.body;
   const names = ['checkout','init','startGame'];
@@ -142,27 +140,36 @@ app.post('/api/generate', async (req, res) => {
   if (!OPENAI_KEY) return res.json({ code:`function ${fn}(){}` });
 
   try {
-    const systemPrompt = `You are a 5D projector. Write ONLY JavaScript. Use Three.js (already loaded). Create scene, camera, renderer. Use Points for particles. For checkout(): end with setTimeout(()=>window.parent.postMessage("INSTALL_CLICK","*"),2500)`;
+    const systemPrompt = `You are a 5D projector. Output ONLY raw JavaScript.
+
+MANDATORY FIRST LINES (copy exactly):
+const scene=new THREE.Scene();const camera=new THREE.PerspectiveCamera(75,window.innerWidth/window.innerHeight,0.1,1000);const renderer=new THREE.WebGLRenderer({antialias:true,alpha:true});renderer.setSize(window.innerWidth,window.innerHeight);document.body.innerHTML='';document.body.appendChild(renderer.domElement);camera.position.z=5;const light=new THREE.PointLight(0xffffff,1.5);light.position.set(5,5,5);scene.add(light);scene.add(new THREE.AmbientLight(0x404040));
+
+THEN: use THREE.Points with BufferGeometry for 5000+ particles. Animate with requestAnimationFrame. For ${fn}(), end with setTimeout(()=>window.parent.postMessage("INSTALL_CLICK","*"),3000) if checkout.`;
+
     const r = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: { 'Authorization': `Bearer ${OPENAI_KEY}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        model: 'gpt-4o-mini',
+        model: 'gpt-4o', // UPGRADED
         messages: [
           {role:'system', content: systemPrompt},
-          {role:'user', content: `Intent: "${intent}". Generate ${fn}() with Three.js.`}
+          {role:'user', content: `Intent: "${intent}". Write complete function ${fn}() using the mandatory Three.js starter.`}
         ],
-        temperature: 0.8, max_tokens: 1500
+        temperature: 0.9,
+        max_tokens: 2000
       })
     });
     const data = await r.json();
     let code = (data.choices?.[0]?.message?.content || '').replace(/```.*?```/gs,'').replace(/```/g,'').trim();
     if (!code.includes(`function ${fn}`)) code = `function ${fn}(){\n${code}\n}`;
-    if(fn==='checkout' &&!code.includes('INSTALL_CLICK')){
-      code = code.replace(/}\s*$/, `\n setTimeout(()=>window.parent.postMessage("INSTALL_CLICK","*"),2500);\n}`);
+    if(!code.includes('THREE.Scene')) {
+      code = `function ${fn}(){ console.error('Three.js required'); }`;
     }
+    console.log('[5D] gpt-4o generated', code.length, 'bytes');
     res.json({ code });
   } catch(e) {
+    console.log('generate error', e.message);
     res.json({ code: `function ${fn}(){}` });
   }
 });
