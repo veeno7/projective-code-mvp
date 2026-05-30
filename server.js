@@ -75,8 +75,8 @@ function projectAll() {
   };
 
   window.scene = new THREE.Scene();
-  scene.background = new THREE.Color(0x050810);
-  scene.fog = new THREE.Fog(0x050810, 12, 45);
+  scene.background = new THREE.Color(0x000000);
+  scene.fog = new THREE.Fog(0x000000, 15, 50);
 
   window.camera = new THREE.PerspectiveCamera(60, innerWidth / innerHeight, 0.1, 200);
   camera.position.set(0, 1.6, 4.5);
@@ -85,19 +85,19 @@ function projectAll() {
   renderer.setSize(innerWidth, innerHeight);
   renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
-  renderer.toneMappingExposure = 1.25;
+  renderer.toneMappingExposure = 1.0;
   renderer.shadowMap.enabled = true;
   renderer.shadowMap.type = THREE.PCFSoftShadowMap;
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   document.body.appendChild(renderer.domElement);
 
-  var sun = new THREE.DirectionalLight(0xffeedd, 1.8);
-  sun.position.set(6, 9, 4);
+  var sun = new THREE.DirectionalLight(0xffffff, 1.2);
+  sun.position.set(5, 8, 4);
   sun.castShadow = true;
   sun.shadow.mapSize.set(1024, 1024);
   scene.add(sun);
-  scene.add(new THREE.HemisphereLight(0x99aaff, 0x111122, 0.7));
-  scene.add(new THREE.AmbientLight(0x333344, 0.5));
+  scene.add(new THREE.HemisphereLight(0x222233, 0x000000, 0.25));
+  scene.add(new THREE.AmbientLight(0x111122, 0.3));
 
   window.controls = new THREE.OrbitControls(camera, renderer.domElement);
   controls.enableDamping = true;
@@ -107,7 +107,7 @@ function projectAll() {
   try {
     composer = new THREE.EffectComposer(renderer);
     composer.addPass(new THREE.RenderPass(scene, camera));
-    composer.addPass(new THREE.UnrealBloomPass(new THREE.Vector2(innerWidth, innerHeight), 0.75, 0.5, 0.1));
+    composer.addPass(new THREE.UnrealBloomPass(new THREE.Vector2(innerWidth, innerHeight), 0.5, 0.4, 0.85));
     window.composer = composer;
   } catch(e) { composer = null; }
 
@@ -129,19 +129,18 @@ function projectAll() {
     return new THREE.Points(g, new THREE.PointsMaterial({ color: c, size: 0.06, transparent: true }));
   };
 
-  var ground = new THREE.Mesh(new THREE.PlaneGeometry(60, 60), new THREE.MeshStandardMaterial({ color: 0x101625, roughness: 0.85, metalness: 0.05 }));
+  var ground = new THREE.Mesh(new THREE.PlaneGeometry(60, 60), new THREE.MeshStandardMaterial({ color: 0x000000, roughness: 1, metalness: 0 }));
   ground.rotation.x = -Math.PI / 2;
   ground.receiveShadow = true;
   scene.add(ground);
 
   var t = 0;
-  var clock = new THREE.Clock();
   function animate() {
     requestAnimationFrame(animate);
-    t += 0.0015;
-    sun.position.x = Math.cos(t) * 9;
-    sun.position.z = Math.sin(t) * 9;
-    world.step(1 / 60);
+    t += 0.001;
+    sun.position.x = Math.cos(t) * 8;
+    sun.position.z = Math.sin(t) * 8;
+    world.step(1/60);
     controls.update();
     mixers.forEach(function(m) { m.update(0.016); });
     if (composer) { composer.render(); } else { renderer.render(scene, camera); }
@@ -212,7 +211,7 @@ app.post('/api/generate', async (req, res) => {
   const { x, intent } = req.body;
   const fn = ['checkout', 'init', 'startGame'][x] || 'fn';
   const OPENAI_KEY = process.env.OPENAI_API_KEY;
-  const prompt = `Scene has: scene, camera, renderer, composer, sun, controls, world, loader, makeParticles(). Add: "${intent}". Use MeshStandardMaterial, castShadow=true. Return ONLY JavaScript.`;
+  const prompt = `Scene has: scene, camera, renderer, composer, sun, controls, world, loader, makeParticles(). Add: "${intent}". Use MeshStandardMaterial, castShadow=true, position y>0. Return ONLY JavaScript.`;
   try {
     const r = await fetch('https://api.openai.com/v1/chat/completions', { method: 'POST', headers: { 'Authorization': `Bearer ${OPENAI_KEY}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ model: 'gpt-4o', messages: [{ role: 'user', content: prompt }], temperature: 0.75, max_tokens: 1400 }) });
     const data = await r.json();
