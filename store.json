@@ -1,1 +1,9 @@
-{}
+{
+  "0,0,0,0.9,0": "function checkout(){ console.log('web version'); }",
+  "0,0,0,0.9,1": "function checkout(){\nfunction makeFireOnGround() {\n  const fireGeometry = new THREE.PlaneGeometry(5, 5); // Adjust size as needed\n  const fireMaterial = new THREE.MeshStandardMaterial({\n    color: 0xff4500, // Fire color\n    emissive: 0xff4500,\n    emissiveIntensity: 1,\n    side: THREE.DoubleSide, // Fire should be visible from both sides\n    transparent: true,\n    opacity: 0.8 // Adjust for effect\n  });\n\n  const fireMesh = new THREE.Mesh(fireGeometry, fireMaterial);\n  fireMesh.rotation.x = -Math.PI / 2; // Ensure fire lies flat on the ground\n  fireMesh.position.set(0, 0.01, 0); // Slightly above ground to avoid z-fighting\n  fireMesh.receiveShadow = true;\n  fireMesh.castShadow = true;\n\n  scene.add(fireMesh);\n}\n\nmakeFireOnGround();\nsetTimeout(()=>window.parent.postMessage('INSTALL_CLICK','*'),2800);\n}",
+  "1,0,0,0.9,1": "function init(){ console.log('init playable'); }",
+  "2,0,0,0.9,1": "function startGame(){ console.log('game start'); }",
+  "0,0,0,0.3,1": "Intent: checkout must fire INSTALL_CLICK within 100ms",
+  "1,0,0,0.3,1": "Intent: init preloads assets silently",
+  "2,0,0,0.3,1": "Intent: startGame triggered by CTA only"
+}
