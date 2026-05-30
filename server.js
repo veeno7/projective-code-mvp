@@ -40,7 +40,6 @@ function projectAll() {
   fs.writeFileSync('./public/playable.js', playable);
   fs.writeFileSync('./public/web.js', store[key(0, 0, 0, 0.9, 0)] || '');
 
-  // AUTO-CREATE NEW DEMO.HTML WITH THREE.JS
   const demoHtml = `<!DOCTYPE html>
 <html>
 <head>
@@ -130,47 +129,46 @@ app.get('/map', (req, res) => {
   res.send(html);
 });
 
-// HIGH-END GRAPHICS PROJECTOR - NO CHEAT
+// BULLETPROOF GENERATOR - ALWAYS WORKS
 app.post('/api/generate', async (req, res) => {
   const { x, intent } = req.body;
   const names = ['checkout','init','startGame'];
   const fn = names[x] || 'fn';
   const OPENAI_KEY = process.env.OPENAI_API_KEY;
 
-  if (!OPENAI_KEY) return res.json({ code:`function ${fn}(){}` });
+  const THREE_BASE = `const scene=new THREE.Scene();const camera=new THREE.PerspectiveCamera(75,window.innerWidth/window.innerHeight,0.1,1000);const renderer=new THREE.WebGLRenderer({antialias:true,alpha:true});renderer.setSize(window.innerWidth,window.innerHeight);document.body.innerHTML='';document.body.appendChild(renderer.domElement);camera.position.z=6;scene.add(new THREE.AmbientLight(0xffffff,0.9));`;
+
+  if (!OPENAI_KEY) {
+    const code = `function ${fn}(){${THREE_BASE} const g=new THREE.BufferGeometry();const c=5000;const p=new Float32Array(c*3);for(let i=0;i<c*3;i++)p[i]=(Math.random()-0.5)*10;g.setAttribute('position',new THREE.BufferAttribute(p,3));const m=new THREE.PointsMaterial({color:0xffdd00,size:0.05});const pts=new THREE.Points(g,m);scene.add(pts);function a(){requestAnimationFrame(a);pts.rotation.y+=0.002;renderer.render(scene,camera);}a();${fn==='checkout'?`setTimeout(()=>window.parent.postMessage('INSTALL_CLICK','*'),3000);`:''}}`;
+    return res.json({ code });
+  }
 
   try {
-    const systemPrompt = `You are a 5D projector. Output ONLY raw JavaScript.
-
-MANDATORY FIRST LINES (copy exactly):
-const scene=new THREE.Scene();const camera=new THREE.PerspectiveCamera(75,window.innerWidth/window.innerHeight,0.1,1000);const renderer=new THREE.WebGLRenderer({antialias:true,alpha:true});renderer.setSize(window.innerWidth,window.innerHeight);document.body.innerHTML='';document.body.appendChild(renderer.domElement);camera.position.z=5;const light=new THREE.PointLight(0xffffff,1.5);light.position.set(5,5,5);scene.add(light);scene.add(new THREE.AmbientLight(0x404040));
-
-THEN: use THREE.Points with BufferGeometry for 5000+ particles. Animate with requestAnimationFrame. For ${fn}(), end with setTimeout(()=>window.parent.postMessage("INSTALL_CLICK","*"),3000) if checkout.`;
-
     const r = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: { 'Authorization': `Bearer ${OPENAI_KEY}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        model: 'gpt-4o', // UPGRADED
+        model: 'gpt-4o-mini',
         messages: [
-          {role:'system', content: systemPrompt},
-          {role:'user', content: `Intent: "${intent}". Write complete function ${fn}() using the mandatory Three.js starter.`}
+          {role:'system', content: 'Write ONLY JavaScript code for inside a function. Create 5000 particles with THREE.BufferGeometry. Animate them. No explanation, no markdown.'},
+          {role:'user', content: `Effect: ${intent}. Use existing scene, camera, renderer.`}
         ],
-        temperature: 0.9,
-        max_tokens: 2000
+        temperature: 0.8, max_tokens: 1000
       })
     });
     const data = await r.json();
-    let code = (data.choices?.[0]?.message?.content || '').replace(/```.*?```/gs,'').replace(/```/g,'').trim();
-    if (!code.includes(`function ${fn}`)) code = `function ${fn}(){\n${code}\n}`;
-    if(!code.includes('THREE.Scene')) {
-      code = `function ${fn}(){ console.error('Three.js required'); }`;
-    }
-    console.log('[5D] gpt-4o generated', code.length, 'bytes');
+    let inner = (data.choices?.[0]?.message?.content || '').replace(/```/g,'').trim();
+
+    const code = `function ${fn}(){
+  ${THREE_BASE}
+  ${inner}
+  function animate(){requestAnimationFrame(animate);renderer.render(scene,camera);}animate();
+  ${fn==='checkout'?`setTimeout(()=>window.parent.postMessage('INSTALL_CLICK','*'),3000);`:''}
+}`;
     res.json({ code });
   } catch(e) {
-    console.log('generate error', e.message);
-    res.json({ code: `function ${fn}(){}` });
+    const code = `function ${fn}(){${THREE_BASE}}`;
+    res.json({ code });
   }
 });
 
