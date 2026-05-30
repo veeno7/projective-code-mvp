@@ -14,6 +14,9 @@ const octokit = GITHUB_TOKEN ? new Octokit({ auth: GITHUB_TOKEN }) : null;
 const REPO_OWNER = 'veeno7';
 const REPO_NAME = 'projective-code-mvp';
 
+// Standardized UUID placeholder to pass foreign key validation constraints
+const DEV_SYSTEM_UUID = '00000000-0000-0000-0000-000000000000';
+
 // Supabase Init (Requires SUPABASE_URL and SUPABASE_KEY in Render Env Vars)
 const supabase = createClient(
   process.env.SUPABASE_URL || 'https://placeholder.supabase.co', 
@@ -33,7 +36,7 @@ try { projectLog = JSON.parse(fs.readFileSync('./project-log.json', 'utf8')); } 
 // ============================================================
 // PROJECT ALL — Assembles 3D demo from Supabase 5D store
 // ============================================================
-async function projectAll(userId = 'default-system-user') {
+async function projectAll(userId = DEV_SYSTEM_UUID) {
   fs.mkdirSync('./public', { recursive: true });
 
   // Fetch the required executable coordinates from Supabase
@@ -47,6 +50,7 @@ async function projectAll(userId = 'default-system-user') {
   const { data: entries } = await supabase
     .from('store_entries')
     .select('coordinate, code')
+    .eq('user_id', userId)
     .in('coordinate', requiredCoords);
 
   const storeMap = {};
@@ -232,7 +236,7 @@ async function triggerRenderDeploy() {
 // 5D STORE ROUTES (Now backed by Supabase)
 // ============================================================
 app.get('/api/project', async (req, res) => {
-  const { user_id = 'default-system-user' } = req.query; // Auth to be added later
+  const userId = req.query.user_id || DEV_SYSTEM_UUID; 
   const coord = key(
     parseInt(req.query.x) || 0,
     parseInt(req.query.y) || 0,
@@ -244,14 +248,15 @@ app.get('/api/project', async (req, res) => {
   const { data, error } = await supabase
       .from('store_entries')
       .select('code')
+      .eq('user_id', userId)
       .eq('coordinate', coord)
-      .maybeSingle(); // Changed from single() so it doesn't throw on empty
+      .maybeSingle(); 
 
   res.json({ code: data?.code || '// empty' });
 });
 
 app.post('/api/save', async (req, res) => {
-  const { x, y, z, w, v, code, user_id = 'default-system-user' } = req.body;
+  const { x, y, z, w, v, code, user_id = DEV_SYSTEM_UUID } = req.body;
   const coord = key(x||0, y||0, z||0, w, v);
 
   // Upsert to Supabase instead of store.json
