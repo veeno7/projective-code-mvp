@@ -8,7 +8,7 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 const GITHUB_TOKEN = process.env.GITHUB_TOKEN;
 const OPENAI_KEY = process.env.OPENAI_API_KEY;
-const octokit = GITHUB_TOKEN? new Octokit({ auth: GITHUB_TOKEN }) : null;
+const octokit = GITHUB_TOKEN ? new Octokit({ auth: GITHUB_TOKEN }) : null;
 
 const REPO_OWNER = 'veeno7';
 const REPO_NAME = 'projective-code-mvp';
@@ -25,8 +25,8 @@ const DEFAULTS = {
   "1,0,0,0.9,1": "function init(){ window.gameState={taps:0,fireScale:0.5}; }",
   "2,0,0,0.9,1": "function startGame(){ scene.children.filter(c=>c.userData?.fire).forEach(c=>scene.remove(c)); const fireGroup=new THREE.Group();fireGroup.userData.fire=true;fireGroup.userData.scale=0.5; const createParticle=()=>{const geo=new THREE.SphereGeometry(0.06,8,8);const mat=new THREE.MeshBasicMaterial({color:new THREE.Color().setHSL(0.07-Math.random()*0.04,1,0.6),transparent:true,opacity:0.9});const p=new THREE.Mesh(geo,mat);p.position.set((Math.random()-0.5)*fireGroup.userData.scale,(Math.random()-0.3)*0.2,(Math.random()-0.5)*fireGroup.userData.scale);p.userData={vy:0.012+Math.random()*0.018,life:0};return p;};for(let i=0;i<60;i++)fireGroup.add(createParticle());scene.add(fireGroup);const light=new THREE.PointLight(0xff5500,2,6);light.position.set(0,0.6,0);light.userData.fire=true;scene.add(light);let growInterval=setInterval(()=>{if(fireGroup.userData.scale<2.2){fireGroup.userData.scale+=0.15;fireGroup.children.forEach(p=>{if(Math.random()<0.3)fireGroup.add(createParticle())});light.intensity=1.8+fireGroup.userData.scale*0.4;}else clearInterval(growInterval);},800);const tapHandler=()=>{const taps=++window.gameState.taps;fireGroup.userData.scale=Math.max(0.3,fireGroup.userData.scale-0.4);fireGroup.children.slice(0,15).forEach(p=>{p.material.opacity*=0.5;p.userData.vy*=1.5});if(taps>=3){clearInterval(growInterval);renderer.domElement.removeEventListener('pointerdown',tapHandler);setTimeout(()=>checkout(),400);}};renderer.domElement.addEventListener('pointerdown',tapHandler);const animate=()=>{fireGroup.children.forEach(p=>{p.position.y+=p.userData.vy;p.userData.life+=0.015;p.material.opacity=Math.max(0,0.9-p.userData.life*0.4);p.scale.setScalar(1+p.userData.life*0.3);if(p.position.y>2.2||p.material.opacity<=0){p.position.y=0;p.position.set((Math.random()-0.5)*fireGroup.userData.scale,0,(Math.random()-0.5)*fireGroup.userData.scale);p.userData.life=0;p.material.opacity=0.9;}});light.intensity=1.5+Math.sin(Date.now()*0.008)*0.6+fireGroup.userData.scale*0.3;requestAnimationFrame(animate);};animate(); }",
 };
-let store = {...DEFAULTS };
-try { store = {...store,...JSON.parse(fs.readFileSync('./store.json', 'utf8')) }; } catch {}
+let store = { ...DEFAULTS };
+try { store = { ...store, ...JSON.parse(fs.readFileSync('./store.json', 'utf8')) }; } catch {}
 Object.keys(DEFAULTS).forEach(k => store[k] = DEFAULTS[k]);
 const key = (x, y, z, w, v) => `${x},${y},${z},${w},${v}`;
 
@@ -51,13 +51,13 @@ async function ghPut(path, code, sha, msg) {
 app.get('/health', (_, res) => res.json({ ok: true, version: '5d-smart', uptime: process.uptime() }));
 
 app.get('/api/project', (req, res) => {
-  const { x=0, y=0, z=0, w=0.9, v=0 } = req.query;
+  const { x = 0, y = 0, z = 0, w = 0.9, v = 0 } = req.query;
   res.json({ code: store[key(+x, +y, +z, +w, +v)] || '' });
 });
 
 app.post('/api/save', async (req, res) => {
   const { x, y, z, w, v, code } = req.body;
-  store[key(x||0, y||0, z||0, w, v)] = code;
+  store[key(x || 0, y || 0, z || 0, w, v)] = code;
   fs.writeFileSync('./store.json', JSON.stringify(store, null, 2));
   projectAll();
   res.json({ ok: true });
@@ -102,7 +102,7 @@ app.post('/api/agent/execute', async (req, res) => {
     if (action === 'smart_edit') {
       const prompt = `You are editing ${path}. Current code:\n${file.code}\n\nTask: ${message}\nReturn ONLY the full updated file, no explanations.`;
       const r = await fetch('https://api.openai.com/v1/chat/completions', { method: 'POST', headers: { Authorization: `Bearer ${OPENAI_KEY}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ model: 'gpt-4o-mini', messages: [{ role: 'user', content: prompt }], temperature: 0 }) });
-      const d = await r.json(); const newCode = d.choices[0].message.content.replace(/```\w*\n|```/g, '');
+      const d = await r.json(); const newCode = d.choices[0].message.content.replace(/\w*\n|/g, '');
       await ghPut(path, newCode, file.sha, 'Smart: ' + message); return res.json({ success: true });
     }
     if (action === 'get_status') { const c = await octokit.repos.listCommits({ owner: REPO_OWNER, repo: REPO_NAME, per_page: 3 }); return res.json({ success: true, commits: c.data.map(x => x.commit.message) }); }
@@ -118,20 +118,20 @@ app.get('/chat', (_, res) => {
 app.post('/api/chat', async (req, res) => {
   if (!OPENAI_KEY) return res.json({ reply: 'Set OPENAI_API_KEY' });
   try {
-    const userMsg = req.body.messages[req.body.messages.length-1].content;
+    const userMsg = req.body.messages[req.body.messages.length - 1].content;
     const lower = userMsg.toLowerCase();
 
     // Always load your code
     const serverCode = await ghGet('server.js').then(f => f.code).catch(() => 'no code');
 
-    const systemPrompt = `You are Lynex AI. You can SEE the user's full server.js code right now. Here it is (first 12k chars):\n\n${serverCode.slice(0,12000)}\n\nAnswer any question about what it does. If user asks to change, add, or fix something, just explain what you'll do - the system will automatically apply the edit.`;
+    const systemPrompt = `You are Lynex AI. You can SEE the user's full server.js code right now. Here it is (first 12k chars):\n\n${serverCode.slice(0, 12000)}\n\nAnswer any question about what it does. If user asks to change, add, or fix something, just explain what you'll do - the system will automatically apply the edit.`;
 
     const r = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: { Authorization: `Bearer ${OPENAI_KEY}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({
         model: 'gpt-4o-mini',
-        messages: [{ role: 'system', content: systemPrompt },...req.body.messages.slice(-8)],
+        messages: [{ role: 'system', content: systemPrompt }, ...req.body.messages.slice(-8)],
         temperature: 0.3
       })
     });
@@ -153,12 +153,31 @@ app.post('/api/chat', async (req, res) => {
 
 app.post('/api/ai/generate', async (req, res) => {
   if (!OPENAI_KEY) return res.json({ code: '// no key' });
-  const { prompt, x=2 } = req.body; const fn = ['checkout','init','startGame'][x];
-  try { const r = await fetch('https://api.openai.com/v1/chat/completions', { method: 'POST', headers: { Authorization: `Bearer ${OPENAI_KEY}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ model: 'gpt-4o', messages: [{ role: 'system', content: 'Return only JS inside function' }, { role: 'user', content: prompt }], temperature: 0.8 }) }); const d = await r.json(); let inner = (d.choices[0]?.message?.content || '').replace(/```.*?\n|```/gs, ''); res.json({ code: `function ${fn}(){${inner}}` }); } catch { res.json({ code: `function ${fn}(){}` }); }
+  const { prompt, x = 2 } = req.body; const fn = ['checkout', 'init', 'startGame'][x];
+  try {
+    const r = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${OPENAI_KEY}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'gpt-4o',
+        messages: [{ role: 'system', content: 'Return only JS inside function' }, { role: 'user', content: prompt }],
+        temperature: 0.8
+      })
+    });
+    const d = await r.json();
+    let inner = (d.choices[0]?.message?.content || '').replace(/.*?\n|/gs, '');
+    res.json({ code: `function ${fn}(){${inner}}` });
+  } catch {
+    res.json({ code: `function ${fn}(){}` });
+  }
 });
 
 app.get('/export/playable.zip', async (_, res) => {
-  projectAll(); const zip = new JSZip(); zip.file('index.html', fs.readFileSync('./public/demo.html')); zip.file('playable.js', fs.readFileSync('./public/playable.js')); res.set('Content-Type', 'application/zip').send(await zip.generateAsync({ type: 'nodebuffer' }));
+  projectAll();
+  const zip = new JSZip();
+  zip.file('index.html', fs.readFileSync('./public/demo.html'));
+  zip.file('playable.js', fs.readFileSync('./public/playable.js'));
+  res.set('Content-Type', 'application/zip').send(await zip.generateAsync({ type: 'nodebuffer' }));
 });
 
 app.listen(PORT, () => console.log('Lynex running on ' + PORT));
