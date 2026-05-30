@@ -48,7 +48,7 @@ async function ghPut(path, code, sha, msg) {
   await octokit.repos.createOrUpdateFileContents({ owner: REPO_OWNER, repo: REPO_NAME, path, branch: BRANCH, message: msg || `Update ${path}`, content: Buffer.from(code).toString('base64'), sha });
 }
 
-app.get('/health', (_, res) => res.json({ ok: true, version: '5d-full', uptime: process.uptime() }));
+app.get('/health', (_, res) => res.json({ ok: true, version: '5d-smart', uptime: process.uptime() }));
 
 app.get('/api/project', (req, res) => {
   const { x=0, y=0, z=0, w=0.9, v=0 } = req.query;
@@ -111,19 +111,43 @@ app.post('/api/agent/execute', async (req, res) => {
 });
 
 app.get('/chat', (_, res) => {
-  res.send(`<!DOCTYPE html><html><head><meta name=viewport content="width=device-width,initial-scale=1"><title>Lynex Chat</title><style>body{margin:0;background:#0b0b12;color:#fff;font-family:system-ui;display:flex;flex-direction:column;height:100vh}#log{flex:1;overflow:auto;padding:12px}#in{display:flex;padding:10px;background:#111}input{flex:1;padding:12px;border:0;border-radius:8px;background:#222;color:#fff}button{margin-left:8px;padding:12px 16px;background:#7c5cff;border:0;border-radius:8px;color:#fff}.m{margin:8px 0;padding:8px 12px;border-radius:8px;max-width:85%}.u{background:#1e1e2e;margin-left:auto}.a{background:#222}</style></head><body><div id=log></div><div id=in><input id=q placeholder="Ask to code..."><button onclick=send()>Send</button></div><script>const log=document.getElementById('log');let h=[];async function send(){const v=q.value;if(!v)return;q.value='';add(v,'u');h.push({role:'user',content:v});const r=await fetch('/api/chat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({messages:h})}).then(r=>r.json());add(r.reply,'a');h.push({role:'assistant',content:r.reply})}function add(t,c){const d=document.createElement('div');d.className='m '+c;d.textContent=t;log.appendChild(d);log.scrollTop=1e9}</script></body></html>`);
+  res.send(`<!DOCTYPE html><html><head><meta name=viewport content="width=device-width,initial-scale=1"><title>Lynex Chat</title><style>body{margin:0;background:#0b0b12;color:#fff;font-family:system-ui;display:flex;flex-direction:column;height:100vh}#log{flex:1;overflow:auto;padding:12px}#in{display:flex;padding:10px;background:#111}input{flex:1;padding:12px;border:0;border-radius:8px;background:#222;color:#fff}button{margin-left:8px;padding:12px 16px;background:#7c5cff;border:0;border-radius:8px;color:#fff}.m{margin:8px 0;padding:8px 12px;border-radius:8px;max-width:85%}.u{background:#1e1e2e;margin-left:auto}.a{background:#222}</style></head><body><div id=log></div><div id=in><input id=q placeholder="Ask about your code..."><button onclick=send()>Send</button></div><script>const log=document.getElementById('log');let h=[];async function send(){const v=q.value;if(!v)return;q.value='';add(v,'u');h.push({role:'user',content:v});const r=await fetch('/api/chat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({messages:h})}).then(r=>r.json());add(r.reply,'a');h.push({role:'assistant',content:r.reply})}function add(t,c){const d=document.createElement('div');d.className='m '+c;d.textContent=t;log.appendChild(d);log.scrollTop=1e9}</script></body></html>`);
 });
 
+// --- UPDATED CHAT: SEES YOUR CODE ---
 app.post('/api/chat', async (req, res) => {
   if (!OPENAI_KEY) return res.json({ reply: 'Set OPENAI_API_KEY' });
   try {
     const userMsg = req.body.messages[req.body.messages.length-1].content;
-    if (userMsg.match(/server\.js|add|create|edit|route/i)) {
-      await fetch(`https://lynex-editor.onrender.com/api/agent/execute`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'smart_edit', path: 'server.js', message: userMsg }) });
-      return res.json({ reply: 'Done. I read server.js, made the change, and pushed it. Wait 60s then refresh.' });
+    const lower = userMsg.toLowerCase();
+
+    // Always load your code
+    const serverCode = await ghGet('server.js').then(f => f.code).catch(() => 'no code');
+
+    const systemPrompt = `You are Lynex AI. You can SEE the user's full server.js code right now. Here it is (first 12k chars):\n\n${serverCode.slice(0,12000)}\n\nAnswer any question about what it does. If user asks to change, add, or fix something, just explain what you'll do - the system will automatically apply the edit.`;
+
+    const r = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${OPENAI_KEY}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'gpt-4o-mini',
+        messages: [{ role: 'system', content: systemPrompt },...req.body.messages.slice(-8)],
+        temperature: 0.3
+      })
+    });
+    const d = await r.json();
+    let reply = d.choices[0].message.content;
+
+    // Auto-edit if user wants changes
+    if (lower.includes('add') || lower.includes('edit') || lower.includes('change') || lower.includes('fix') || lower.includes('create') || lower.includes('update')) {
+      await fetch('https://lynex-editor.onrender.com/api/agent/execute', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'smart_edit', path: 'server.js', message: userMsg })
+      });
+      reply += '\n\n✓ I updated your code and pushed it to GitHub.';
     }
-    const r = await fetch('https://api.openai.com/v1/chat/completions', { method: 'POST', headers: { Authorization: `Bearer ${OPENAI_KEY}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ model: 'gpt-4o-mini', messages: [{ role: 'system', content: 'You are Lynex coding assistant.' },...req.body.messages.slice(-6)], temperature: 0.4 }) });
-    const d = await r.json(); res.json({ reply: d.choices[0].message.content });
+
+    res.json({ reply });
   } catch (e) { res.json({ reply: 'Error: ' + e.message }); }
 });
 
