@@ -15,7 +15,6 @@ app.use(cors());
 app.use(express.json());
 app.use(express.static('public'));
 
-// --- 5D STORE ---
 const DEFAULTS = {
   "0,0,0,0.9,0": "function checkout(){ console.log('web version'); }",
   "0,0,0,0.9,1": "function checkout(){\n console.log('playable CTA from 5D');\n window.parent.postMessage('INSTALL_CLICK','*');\n}",
@@ -27,10 +26,7 @@ const DEFAULTS = {
 };
 
 let store = { ...DEFAULTS };
-try {
-  const saved = JSON.parse(fs.readFileSync('./store.json', 'utf8'));
-  store = { ...store, ...saved };
-} catch (e) {}
+try { const saved = JSON.parse(fs.readFileSync('./store.json', 'utf8')); store = { ...store, ...saved }; } catch (e) {}
 
 const key = (x, y, z, w, v) => `${x},${y},${z},${w},${v}`;
 
@@ -69,7 +65,7 @@ function projectAll() {
 <script src="https://cdn.jsdelivr.net/npm/three@0.145.0/examples/js/postprocessing/RenderPass.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.145.0/examples/js/postprocessing/ShaderPass.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.145.0/examples/js/postprocessing/UnrealBloomPass.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/cannon-es@0.20.0/dist/cannon-es.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/cannon.js/0.6.2/cannon.min.js"></script>
 
 <script>
   window.onerror = function(msg, src, line) {
@@ -113,13 +109,11 @@ function projectAll() {
     composer.addPass(new THREE.RenderPass(scene, camera));
     composer.addPass(new THREE.UnrealBloomPass(new THREE.Vector2(innerWidth, innerHeight), 0.75, 0.5, 0.1));
     window.composer = composer;
-  } catch(e) {
-    console.warn('Bloom unavailable:', e);
-    composer = null;
-  }
+  } catch(e) { composer = null; }
 
-  window.world = new CANNON.World({ gravity: new CANNON.Vec3(0, -9.82, 0) });
-  var gb = new CANNON.Body({ type: CANNON.Body.STATIC, shape: new CANNON.Plane() });
+  window.world = new CANNON.World();
+  world.gravity.set(0, -9.82, 0);
+  var gb = new CANNON.Body({ mass: 0, shape: new CANNON.Plane() });
   gb.quaternion.setFromEuler(-Math.PI / 2, 0, 0);
   world.addBody(gb);
 
@@ -147,7 +141,7 @@ function projectAll() {
     t += 0.0015;
     sun.position.x = Math.cos(t) * 9;
     sun.position.z = Math.sin(t) * 9;
-    world.step(1 / 60, clock.getDelta(), 3);
+    world.step(1 / 60);
     controls.update();
     mixers.forEach(function(m) { m.update(0.016); });
     if (composer) { composer.render(); } else { renderer.render(scene, camera); }
@@ -187,15 +181,11 @@ async function commitToGitHub() {
     const content = Buffer.from(JSON.stringify(store, null, 2)).toString('base64');
     const { data: file } = await octokit.repos.getContent({ owner: REPO_OWNER, repo: REPO_NAME, path: 'store.json' }).catch(() => ({ data: { sha: null } }));
     await octokit.repos.createOrUpdateFileContents({ owner: REPO_OWNER, repo: REPO_NAME, path: 'store.json', message: `5D save ${new Date().toISOString()}`, content, sha: file.sha || undefined });
-  } catch(e) { console.log('GitHub commit failed', e.message); }
+  } catch(e) {}
 }
 
 app.get('/api/project', (req, res) => {
-  const x = parseInt(req.query.x) || 0;
-  const y = parseInt(req.query.y) || 0;
-  const z = parseInt(req.query.z) || 0;
-  const w = parseFloat(req.query.w) || 0.9;
-  const v = parseInt(req.query.v) || 0;
+  const x = parseInt(req.query.x) || 0; const y = parseInt(req.query.y) || 0; const z = parseInt(req.query.z) || 0; const w = parseFloat(req.query.w) || 0.9; const v = parseInt(req.query.v) || 0;
   res.json({ code: store[key(x, y, z, w, v)] || '// empty' });
 });
 
@@ -203,8 +193,7 @@ app.post('/api/save', async (req, res) => {
   const { x, y, z, w, v, code } = req.body;
   store[key(x||0, y||0, z||0, w, v)] = code;
   try { fs.writeFileSync('./store.json', JSON.stringify(store, null, 2)); } catch (e) {}
-  projectAll();
-  await commitToGitHub();
+  projectAll(); await commitToGitHub();
   const version = Date.now();
   res.json({ ok: true, preview: `https://lynex-editor.onrender.com/demo.html?auto=1&v=${version}` });
 });
@@ -214,22 +203,16 @@ app.get('/export/playable.zip', async (req, res) => {
   const zip = new JSZip();
   zip.file('index.html', fs.readFileSync('./public/demo.html', 'utf8'));
   zip.file('playable.js', fs.readFileSync('./public/playable.js', 'utf8'));
-  zip.file('README.md', `# Lynex 5D Playable\nBuilt ${new Date().toISOString()}`);
   const buf = await zip.generateAsync({ type: 'nodebuffer' });
   res.set({ 'Content-Type': 'application/zip', 'Content-Disposition': 'attachment; filename=lynex-playable.zip' });
   res.send(buf);
-});
-
-app.get('/map', (req, res) => {
-  const rows = Object.entries(store).map(([k, v]) => `<tr><td>${k}</td><td><pre>${v.slice(0, 200)}</pre></td></tr>`).join('');
-  res.send(`<html><body style="background:#0b0f1a;color:#eee;font-family:system-ui;padding:20px"><h1>5D Store</h1><table border=1 cellpadding=6>${rows}</table></body></html>`);
 });
 
 app.post('/api/generate', async (req, res) => {
   const { x, intent } = req.body;
   const fn = ['checkout', 'init', 'startGame'][x] || 'fn';
   const OPENAI_KEY = process.env.OPENAI_API_KEY;
-  const prompt = `Scene already has: scene, camera, renderer, composer, sun, controls, world (cannon-es), loader, makeParticles(), listener. Add: "${intent}". Use MeshStandardMaterial, castShadow=true. Return ONLY JavaScript.`;
+  const prompt = `Scene has: scene, camera, renderer, composer, sun, controls, world, loader, makeParticles(). Add: "${intent}". Use MeshStandardMaterial, castShadow=true. Return ONLY JavaScript.`;
   try {
     const r = await fetch('https://api.openai.com/v1/chat/completions', { method: 'POST', headers: { 'Authorization': `Bearer ${OPENAI_KEY}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ model: 'gpt-4o', messages: [{ role: 'user', content: prompt }], temperature: 0.75, max_tokens: 1400 }) });
     const data = await r.json();
