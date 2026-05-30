@@ -2,8 +2,6 @@ const express = require('express');
 const cors = require('cors');
 const fs = require('fs');
 const JSZip = require('jszip');
-const morgan = require('morgan');
-const winston = require('winston');
 const { Octokit } = require('@octokit/rest');
 
 const app = express();
@@ -16,57 +14,75 @@ const REPO_OWNER = 'veeno7';
 const REPO_NAME = 'projective-code-mvp';
 const BRANCH = 'main';
 
-// --- IMPROVEMENT 2: LOGGING ---
-const logger = winston.createLogger({
-  level: 'info',
-  format: winston.format.combine(winston.format.timestamp(), winston.format.json()),
-  transports: [new winston.transports.Console(), new winston.transports.File({ filename: 'lynex.log' })]
-});
-app.use(morgan('tiny'));
-app.use((req,res,next)=>{ logger.info(`${req.method} ${req.path}`); next(); });
-
 app.use(cors());
 app.use(express.json({ limit: '20mb' }));
 app.use(express.static('public'));
 
-// --- 5D STORE (unchanged) ---
-const DEFAULTS = { /* your game code here — keep as is */ };
+// --- Simple logger (no install needed) ---
+const logger = { info: (m)=>console.log('[INFO]',m), error: (m)=>console.error('[ERROR]',m) };
+app.use((req,res,next)=>{ logger.info(req.method+' '+req.path); next(); });
+
+// --- 5D STORE ---
+const DEFAULTS = {
+  "0,0,0,0.9,0": "function checkout(){ console.log('web'); }",
+  "0,0,0,0.9,1": "function checkout(){ window.parent.postMessage('INSTALL_CLICK','*'); }",
+  "1,0,0,0.9,1": "function init(){ window.gameState={taps:0,fireScale:0.5}; }",
+  "2,0,0,0.9,1": "function startGame(){ scene.children.filter(c=>c.userData?.fire).forEach(c=>scene.remove(c)); const fireGroup=new THREE.Group();fireGroup.userData.fire=true;fireGroup.userData.scale=0.5; const createParticle=()=>{const geo=new THREE.SphereGeometry(0.06,8,8);const mat=new THREE.MeshBasicMaterial({color:new THREE.Color().setHSL(0.07-Math.random()*0.04,1,0.6),transparent:true,opacity:0.9});const p=new THREE.Mesh(geo,mat);p.position.set((Math.random()-0.5)*fireGroup.userData.scale,(Math.random()-0.3)*0.2,(Math.random()-0.5)*fireGroup.userData.scale);p.userData={vy:0.012+Math.random()*0.018,life:0};return p;};for(let i=0;i<60;i++)fireGroup.add(createParticle());scene.add(fireGroup);const light=new THREE.PointLight(0xff5500,2,6);light.position.set(0,0.6,0);light.userData.fire=true;scene.add(light);let growInterval=setInterval(()=>{if(fireGroup.userData.scale<2.2){fireGroup.userData.scale+=0.15;fireGroup.children.forEach(p=>{if(Math.random()<0.3)fireGroup.add(createParticle())});light.intensity=1.8+fireGroup.userData.scale*0.4;}else clearInterval(growInterval);},800);const tapHandler=()=>{const taps=++window.gameState.taps;fireGroup.userData.scale=Math.max(0.3,fireGroup.userData.scale-0.4);fireGroup.children.slice(0,15).forEach(p=>{p.material.opacity*=0.5;p.userData.vy*=1.5});if(taps>=3){clearInterval(growInterval);renderer.domElement.removeEventListener('pointerdown',tapHandler);setTimeout(()=>checkout(),400);}};renderer.domElement.addEventListener('pointerdown',tapHandler);const animate=()=>{fireGroup.children.forEach(p=>{p.position.y+=p.userData.vy;p.userData.life+=0.015;p.material.opacity=Math.max(0,0.9-p.userData.life*0.4);p.scale.setScalar(1+p.userData.life*0.3);if(p.position.y>2.2||p.material.opacity<=0){p.position.y=0;p.position.set((Math.random()-0.5)*fireGroup.userData.scale,0,(Math.random()-0.5)*fireGroup.userData.scale);p.userData.life=0;p.material.opacity=0.9;}});light.intensity=1.5+Math.sin(Date.now()*0.008)*0.6+fireGroup.userData.scale*0.3;requestAnimationFrame(animate);};animate(); }",
+};
 let store = {...DEFAULTS };
 try { store = {...store,...JSON.parse(fs.readFileSync('./store.json','utf8')) }; } catch {}
+Object.keys(DEFAULTS).forEach(k => store[k] = DEFAULTS[k]);
 const key = (x,y,z,w,v)=>`${x},${y},${z},${w},${v}`;
-function projectAll(){ /* same */ }
+
+function projectAll(){
+  fs.mkdirSync('./public',{recursive:true});
+  const playable=[0,1,2].map(x=>store[key(x,0,0,0.9,1)]||'').join('\n\n');
+  fs.writeFileSync('./public/playable.js',playable);
+  fs.writeFileSync('./public/web.js',store[key(0,0,0,0.9,0)]||'');
+  const html=`<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Lynex</title><style>body{margin:0;background:#000;overflow:hidden}canvas{display:block}#cta{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.85)}#btn{padding:18px 36px;font-size:20px;background:#7c5cff;color:#fff;border:0;border-radius:12px}</style></head><body><div id=cta><button id=btn>TAP</button></div><script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/0.145.0/three.min.js"></script><script>window.scene=new THREE.Scene();window.camera=new THREE.PerspectiveCamera(65,innerWidth/innerHeight,0.1,100);camera.position.set(0,1.4,3.2);window.renderer=new THREE.WebGLRenderer({antialias:true});renderer.setSize(innerWidth,innerHeight);document.body.appendChild(renderer.domElement);function loop(){requestAnimationFrame(loop);renderer.render(scene,camera)}loop();const s=document.createElement('script');s.src='/playable.js?v='+Date.now();s.onload=()=>{try{init()}catch(e){}};document.body.appendChild(s);btn.onclick=()=>{cta.style.display='none';try{startGame()}catch(e){}};</script></body></html>`;
+  fs.writeFileSync('./public/demo.html',html);
+}
 projectAll();
 
-// --- IMPROVEMENT 1: MODULARIZED GITHUB ---
+// --- IMPROVEMENT 1: Modular GitHub ---
 const github = {
   async get(path){ const {data}=await octokit.repos.getContent({owner:REPO_OWNER,repo:REPO_NAME,path,ref:BRANCH}); return {code:Buffer.from(data.content,'base64').toString('utf8'),sha:data.sha}; },
-  async put(path,code,sha,msg){ await octokit.repos.createOrUpdateFileContents({owner:REPO_OWNER,repo:REPO_NAME,path,branch:BRANCH,message:msg||`Update ${path}`,content:Buffer.from(code).toString('base64'),sha}); }
+  async put(path,code,sha,msg){ await octokit.repos.createOrUpdateFileContents({owner:REPO_OWNER,repo:REPO_NAME,path,branch:BRANCH,message:msg||'Update',content:Buffer.from(code).toString('base64'),sha}); }
 };
 
-app.get('/health', (_,res)=>res.json({ok:true,version:'5d-improved'}));
+app.get('/health',(_,res)=>res.json({ok:true,version:'5d-fixed'}));
 
-// --- IMPROVEMENT 3: BETTER ERROR HANDLING ---
-app.post('/api/agent/execute', async (req,res)=>{
-  try {
-    const {action,path,code,message}=req.body;
-    const file = await github.get(path).catch(()=>({code:'',sha:null}));
+app.get('/api/project',(req,res)=>{ const {x=0,y=0,z=0,w=0.9,v=0}=req.query; res.json({code:store[key(+x,+y,+z,+w,+v)]||''}); });
+app.post('/api/save',async(req,res)=>{ const {x,y,z,w,v,code}=req.body; store[key(x||0,y||0,z||0,w,v)]=code; fs.writeFileSync('./store.json',JSON.stringify(store,null,2)); projectAll(); res.json({ok:true}); });
+
+// --- IMPROVEMENT 3: Better errors ---
+app.post('/api/agent/execute',async(req,res)=>{
+  try{
+    const {action,path,message}=req.body;
+    const file=await github.get(path).catch(()=>({code:'',sha:null}));
     if(action==='smart_edit'){
-      const prompt=`Edit ${path}. Current:\n${file.code}\n\nTask:${message}\nReturn full file only.`;
-      const r=await fetch('https://api.openai.com/v1/chat/completions',{method:'POST',headers:{Authorization:`Bearer ${OPENAI_KEY}`,'Content-Type':'application/json'},body:JSON.stringify({model:'gpt-4o-mini',messages:[{role:'user',content:prompt}],temperature:0})});
-      const d=await r.json(); const newCode=d.choices[0].message.content.replace(/```[\w]*\n|```/g,'');
-      await github.put(path,newCode,file.sha,'AI: '+message);
-      logger.info(`Smart edit: ${path}`);
+      const r=await fetch('https://api.openai.com/v1/chat/completions',{method:'POST',headers:{Authorization:`Bearer ${OPENAI_KEY}`,'Content-Type':'application/json'},body:JSON.stringify({model:'gpt-4o-mini',messages:[{role:'user',content:`Current ${path}:\n${file.code}\n\nTask:${message}\nReturn full file only.`}],temperature:0})});
+      const d=await r.json(); const newCode=d.choices[0].message.content.replace(/```\w*\n|```/g,'');
+      await github.put(path,newCode,file.sha,'AI edit');
+      logger.info('Edited '+path);
       return res.json({success:true});
     }
     res.json({success:false});
-  } catch(e){
-    logger.error(e.message);
-    if(e.status===404) return res.status(404).json({error:'File not found on GitHub'});
-    if(e.status===403) return res.status(403).json({error:'GitHub token invalid or rate limited'});
-    res.status(500).json({error:'Server error: '+e.message});
-  }
+  }catch(e){ logger.error(e.message); res.status(500).json({error:e.message}); }
 });
 
-//... keep your /chat, /api/chat, /api/save etc. same as before...
+app.get('/chat',(_,res)=>{ res.send(`<!DOCTYPE html><html><head><meta name=viewport content="width=device-width,initial-scale=1"><title>Chat</title><style>body{margin:0;background:#0b0b12;color:#fff;font-family:system-ui;display:flex;flex-direction:column;height:100vh}#log{flex:1;overflow:auto;padding:12px}#in{display:flex;padding:10px;background:#111}input{flex:1;padding:12px;border:0;border-radius:8px;background:#222;color:#fff}button{margin-left:8px;padding:12px;background:#7c5cff;border:0;border-radius:8px;color:#fff}.m{margin:8px 0;padding:8px 12px;border-radius:8px;max-width:85%}.u{background:#1e1e2e;margin-left:auto}.a{background:#222}</style></head><body><div id=log></div><div id=in><input id=q placeholder="Ask..."><button onclick=send()>Send</button></div><script>const log=document.getElementById('log');let h=[];async function send(){const v=q.value;if(!v)return;q.value='';add(v,'u');h.push({role:'user',content:v});const r=await fetch('/api/chat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({messages:h})}).then(r=>r.json());add(r.reply,'a');h.push({role:'assistant',content:r.reply})}function add(t,c){const d=document.createElement('div');d.className='m '+c;d.textContent=t;log.appendChild(d);log.scrollTop=1e9}</script></body></html>`); });
 
-app.listen(PORT, ()=>logger.info('Lynex improved running'));
+app.post('/api/chat',async(req,res)=>{
+  try{
+    const userMsg=req.body.messages[req.body.messages.length-1].content;
+    const code=await github.get('server.js').then(f=>f.code).catch(()=>'');
+    const sys=`You see the user's server.js. Answer about it. Code start:\n${code.slice(0,8000)}`;
+    const r=await fetch('https://api.openai.com/v1/chat/completions',{method:'POST',headers:{Authorization:`Bearer ${OPENAI_KEY}`,'Content-Type':'application/json'},body:JSON.stringify({model:'gpt-4o-mini',messages:[{role:'system',content:sys},...req.body.messages.slice(-6)],temperature:0.3})});
+    const d=await r.json(); let reply=d.choices[0].message.content;
+    if(/add|edit|fix|change|update/i.test(userMsg)){ await fetch('https://lynex-editor.onrender.com/api/agent/execute',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'smart_edit',path:'server.js',message:userMsg})}); reply+='\n\n✓ Pushed to GitHub'; }
+    res.json({reply});
+  }catch(e){ res.json({reply:'Error: '+e.message}); }
+});
+
+app.listen(PORT,()=>logger.info('Lynex running'));
