@@ -69,44 +69,96 @@ function projectAll() {
 <body>
 <div id="cta"><h1>Lynex 5D</h1><button onclick="play()">Play Now</button></div>
 <div id="err"></div>
-<script src="https://cdn.jsdelivr.net/npm/three@0.148.0/build/three.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/three@0.148.0/examples/js/controls/OrbitControls.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/three@0.148.0/examples/js/loaders/GLTFLoader.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/three@0.148.0/examples/js/shaders/LuminosityHighPassShader.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/three@0.148.0/examples/js/shaders/CopyShader.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/three@0.148.0/examples/js/postprocessing/EffectComposer.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/three@0.148.0/examples/js/postprocessing/RenderPass.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/three@0.148.0/examples/js/postprocessing/ShaderPass.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/three@0.148.0/examples/js/postprocessing/UnrealBloomPass.js"></script>
+<!-- Only two guaranteed CDN deps: Three.js core + cannon-es -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/cannon-es@0.20.0/dist/cannon-es.js"></script>
 <script>
   window.onerror=function(msg,src,line){var e=document.getElementById('err');e.style.display='block';e.textContent+='ERROR: '+msg+'\\n'+(src||'')+':'+line+'\\n\\n';};
-  window.scene=new THREE.Scene();scene.background=new THREE.Color(0x050810);scene.fog=new THREE.Fog(0x050810,12,45);
-  window.camera=new THREE.PerspectiveCamera(60,innerWidth/innerHeight,0.1,200);camera.position.set(0,1.6,4.5);
+
+  // Scene
+  window.scene=new THREE.Scene();
+  scene.background=new THREE.Color(0x050810);
+  scene.fog=new THREE.Fog(0x050810,12,45);
+
+  // Camera
+  window.camera=new THREE.PerspectiveCamera(60,innerWidth/innerHeight,0.1,200);
+  camera.position.set(0,3,8);
+  camera.lookAt(0,1,0);
+
+  // Renderer
   window.renderer=new THREE.WebGLRenderer({antialias:true,powerPreference:'high-performance'});
-  renderer.setSize(innerWidth,innerHeight);renderer.setPixelRatio(Math.min(devicePixelRatio,2));
-  renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=1.25;
-  renderer.shadowMap.enabled=true;renderer.shadowMap.type=THREE.PCFSoftShadowMap;
-  renderer.outputEncoding=THREE.sRGBEncoding;document.body.appendChild(renderer.domElement);
-  var sun=new THREE.DirectionalLight(0xffeedd,1.8);sun.position.set(6,9,4);sun.castShadow=true;sun.shadow.mapSize.set(1024,1024);scene.add(sun);
-  scene.add(new THREE.HemisphereLight(0x99aaff,0x111122,0.7));scene.add(new THREE.AmbientLight(0x333344,0.5));
-  window.controls=new THREE.OrbitControls(camera,renderer.domElement);controls.enableDamping=true;controls.target.set(0,1,0);
-  var composer=null;
-  try{composer=new THREE.EffectComposer(renderer);composer.addPass(new THREE.RenderPass(scene,camera));composer.addPass(new THREE.UnrealBloomPass(new THREE.Vector2(innerWidth,innerHeight),0.75,0.5,0.1));window.composer=composer;}catch(e){composer=null;}
+  renderer.setSize(innerWidth,innerHeight);
+  renderer.setPixelRatio(Math.min(devicePixelRatio,2));
+  renderer.toneMapping=THREE.ACESFilmicToneMapping;
+  renderer.toneMappingExposure=1.25;
+  renderer.shadowMap.enabled=true;
+  renderer.shadowMap.type=THREE.PCFSoftShadowMap;
+  document.body.appendChild(renderer.domElement);
+
+  // Lights
+  var sun=new THREE.DirectionalLight(0xffeedd,1.8);
+  sun.position.set(6,9,4);sun.castShadow=true;
+  sun.shadow.mapSize.width=1024;sun.shadow.mapSize.height=1024;
+  scene.add(sun);
+  scene.add(new THREE.HemisphereLight(0x99aaff,0x111122,0.7));
+  scene.add(new THREE.AmbientLight(0x333344,0.5));
+
+  // Ground
+  var ground=new THREE.Mesh(
+    new THREE.PlaneGeometry(60,60),
+    new THREE.MeshStandardMaterial({color:0x101625,roughness:0.85,metalness:0.05})
+  );
+  ground.rotation.x=-Math.PI/2;ground.receiveShadow=true;scene.add(ground);
+
+  // Physics
   window.world=new CANNON.World({gravity:new CANNON.Vec3(0,-9.82,0)});
-  var gb=new CANNON.Body({type:CANNON.Body.STATIC,shape:new CANNON.Plane()});gb.quaternion.setFromEuler(-Math.PI/2,0,0);world.addBody(gb);
-  window.listener=new THREE.AudioListener();camera.add(listener);
-  window.loader=new THREE.GLTFLoader();window.mixers=[];
-  window.makeParticles=function(n,c){var g=new THREE.BufferGeometry();var a=new Float32Array(n*3);for(var i=0;i<n*3;i++)a[i]=(Math.random()-0.5)*6;g.setAttribute('position',new THREE.BufferAttribute(a,3));return new THREE.Points(g,new THREE.PointsMaterial({color:c,size:0.06,transparent:true}));};
-  var ground=new THREE.Mesh(new THREE.PlaneGeometry(60,60),new THREE.MeshStandardMaterial({color:0x101625,roughness:0.85,metalness:0.05}));ground.rotation.x=-Math.PI/2;ground.receiveShadow=true;scene.add(ground);
+  var gb=new CANNON.Body({type:CANNON.Body.STATIC,shape:new CANNON.Plane()});
+  gb.quaternion.setFromEuler(-Math.PI/2,0,0);world.addBody(gb);
+
+  // Helpers for generated code
+  window.mixers=[];
+  window.makeParticles=function(n,c){
+    var g=new THREE.BufferGeometry();
+    var a=new Float32Array(n*3);
+    for(var i=0;i<n*3;i++)a[i]=(Math.random()-0.5)*6;
+    g.setAttribute('position',new THREE.BufferAttribute(a,3));
+    return new THREE.Points(g,new THREE.PointsMaterial({color:c,size:0.06,transparent:true}));
+  };
+  window.controls={update:function(){}};
+  window.composer=null;
+  window.loader=null;
+
+  // Render loop
   var t=0,clock=new THREE.Clock();
-  function animate(){requestAnimationFrame(animate);t+=0.0015;sun.position.x=Math.cos(t)*9;sun.position.z=Math.sin(t)*9;world.step(1/60,clock.getDelta(),3);controls.update();mixers.forEach(function(m){m.update(0.016);});if(composer){composer.render();}else{renderer.render(scene,camera);}}
+  function animate(){
+    requestAnimationFrame(animate);
+    t+=0.0015;
+    sun.position.x=Math.cos(t)*9;
+    sun.position.z=Math.sin(t)*9;
+    try{world.step(1/60,clock.getDelta(),3);}catch(e){}
+    mixers.forEach(function(m){try{m.update(0.016);}catch(e){}});
+    renderer.render(scene,camera);
+  }
   animate();
-  window.addEventListener('resize',function(){camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight);if(composer)composer.setSize(innerWidth,innerHeight);});
-  var s=document.createElement('script');s.src='/playable.js?v='+Date.now();
+
+  window.addEventListener('resize',function(){
+    camera.aspect=innerWidth/innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(innerWidth,innerHeight);
+  });
+
+  // Load generated scene code after everything is ready
+  var s=document.createElement('script');
+  s.src='/playable.js?v='+Date.now();
   s.onload=function(){try{init();}catch(e){console.warn('init:',e);}};
+  s.onerror=function(){console.warn('playable.js failed');};
   document.body.appendChild(s);
-  function play(){document.getElementById('cta').style.display='none';try{startGame();}catch(e){}setTimeout(function(){try{checkout();}catch(e){}},1200);}
+
+  function play(){
+    document.getElementById('cta').style.display='none';
+    try{startGame();}catch(e){}
+    setTimeout(function(){try{checkout();}catch(e){}},1200);
+  }
   window.play=play;
   if(location.search.includes('auto'))play();
 </script>
