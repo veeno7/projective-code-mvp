@@ -18,11 +18,11 @@ app.use(express.static('public'));
 const DEFAULTS = {
   "0,0,0,0.9,0": "function checkout(){ console.log('web version'); }",
   "0,0,0,0.9,1": "function checkout(){\n console.log('playable CTA from 5D');\n window.parent.postMessage('INSTALL_CLICK','*');\n}",
-  "1,0,0,0.9,1": "function init(){ console.log('init playable'); }",
-  "2,0,0,0.9,1": "function startGame(){ console.log('game start'); }",
+  "1,0,0,0.9,1": "function init(){ console.log('init playable - preloading'); }",
+  "2,0,0,0.9,1": "function startGame(){\n  scene.children.filter(c=>c.userData&&c.userData.fire).forEach(c=>scene.remove(c));\n  const fireGroup = new THREE.Group(); fireGroup.userData.fire = true;\n  const count = 80; const geo = new THREE.SphereGeometry(0.08, 8, 8);\n  for(let i=0; i<count; i++){\n    const mat = new THREE.MeshBasicMaterial({ color: new THREE.Color().setHSL(0.08 - Math.random()*0.05, 1, 0.6), transparent: true, opacity: 0.85 });\n    const p = new THREE.Mesh(geo, mat);\n    p.position.set((Math.random()-0.5)*0.6, Math.random()*0.2, (Math.random()-0.5)*0.6);\n    p.userData = { vy: 0.015 + Math.random()*0.02, life: Math.random() };\n    fireGroup.add(p);\n  }\n  scene.add(fireGroup);\n  const light = new THREE.PointLight(0xff6600, 2, 5); light.position.set(0, 0.5, 0); light.userData.fire = true; scene.add(light);\n  const animateFire = () => {\n    fireGroup.children.forEach(p => {\n      p.position.y += p.userData.vy; p.userData.life += 0.02;\n      p.material.opacity = 0.85 * (1 - p.userData.life*0.3);\n      p.scale.setScalar(1 + p.userData.life*0.5);\n      if(p.position.y > 2.5){ p.position.y = 0; p.userData.life = 0; }\n    });\n    light.intensity = 1.5 + Math.sin(Date.now()*0.01)*0.5;\n    requestAnimationFrame(animateFire);\n  };\n  animateFire();\n}",
   "0,0,0,0.3,1": "Intent: checkout must fire INSTALL_CLICK within 100ms",
   "1,0,0,0.3,1": "Intent: init preloads assets silently",
-  "2,0,0,0.3,1": "Intent: startGame triggered by CTA only"
+  "2,0,0,0.3,1": "Intent: startGame creates flickering fire particles"
 };
 
 let store = { ...DEFAULTS };
