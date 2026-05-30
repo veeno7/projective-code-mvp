@@ -1,0 +1,34 @@
+// demo.html - The stable Engine
+const LynexRenderer = {
+    groups: {}, // Namespaced by coordinate
+    
+    init() {
+        this.scene = window.scene; // Assuming your existing globals
+        this.world = window.world; 
+    },
+
+    renderLayer(coordinate, jsonData) {
+        // Clear old layer
+        if (this.groups[coordinate]) this.scene.remove(this.groups[coordinate]);
+        this.groups[coordinate] = new THREE.Group();
+        this.scene.add(this.groups[coordinate]);
+
+        const data = JSON.parse(jsonData);
+        data.objects.forEach(obj => {
+            // 1. Create Mesh
+            const geo = obj.type === 'box' ? new THREE.BoxGeometry(...obj.size) : new THREE.SphereGeometry(obj.size[0]);
+            const mat = new THREE.MeshStandardMaterial({ color: 0x00ff00 });
+            const mesh = new THREE.Mesh(geo, mat);
+            mesh.position.set(...obj.pos);
+            
+            // 2. Create Physics
+            const body = new CANNON.Body({ mass: obj.mass, shape: new CANNON.Box(new CANNON.Vec3(...obj.size.map(s => s/2))) });
+            body.position.set(...obj.pos);
+            
+            // 3. Add to Layer
+            this.groups[coordinate].add(mesh);
+            this.world.addBody(body);
+        });
+    }
+};
+LynexRenderer.init();
