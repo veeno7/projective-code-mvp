@@ -39,6 +39,31 @@ function projectAll() {
   const playable = [0, 1, 2].map(x => store[key(x, 0, 0, 0.9, 1)] || '').join('\n\n');
   fs.writeFileSync('./public/playable.js', playable);
   fs.writeFileSync('./public/web.js', store[key(0, 0, 0, 0.9, 0)] || '');
+
+  // AUTO-CREATE NEW DEMO.HTML WITH THREE.JS
+  const demoHtml = `<!DOCTYPE html>
+<html>
+<head>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Lynex 5D Preview</title>
+<script src="https://unpkg.com/three@0.160.0/build/three.min.js"></script>
+<style>body{margin:0;background:#000;overflow:hidden;font-family:system-ui}#cta{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);text-align:center;z-index:10}button{padding:16px 32px;font-size:18px;background:#7c5cff;color:white;border:none;border-radius:12px}</style>
+</head>
+<body>
+  <div id="cta"><h1 style="color:white">Tap to Install</h1><button onclick="play()">Play Now</button></div>
+  <script src="/playable.js?v=${Date.now()}"></script>
+  <script>
+    try{init()}catch(e){}
+    function play(){
+      document.getElementById('cta').style.display='none';
+      try{startGame()}catch(e){}
+      setTimeout(()=>{try{checkout()}catch(e){}}, 1500);
+    }
+    if(location.search.includes('auto')) play();
+  </script>
+</body>
+</html>`;
+  fs.writeFileSync('./public/demo.html', demoHtml);
 }
 projectAll();
 
@@ -48,12 +73,9 @@ async function commitToGitHub() {
     const content = Buffer.from(JSON.stringify(store, null, 2)).toString('base64');
     const { data: file } = await octokit.repos.getContent({ owner: REPO_OWNER, repo: REPO_NAME, path: 'store.json' }).catch(()=>({data:{sha:null}}));
     await octokit.repos.createOrUpdateFileContents({
-      owner: REPO_OWNER,
-      repo: REPO_NAME,
-      path: 'store.json',
+      owner: REPO_OWNER, repo: REPO_NAME, path: 'store.json',
       message: `5D save ${new Date().toISOString()}`,
-      content,
-      sha: file.sha || undefined
+      content, sha: file.sha || undefined
     });
   } catch(e){ console.log('GitHub commit failed', e.message); }
 }
@@ -73,7 +95,22 @@ app.post('/api/save', async (req, res) => {
   try { fs.writeFileSync('./store.json', JSON.stringify(store, null, 2)); } catch (e) {}
   projectAll();
   await commitToGitHub();
-  res.json({ ok: true });
+  // RETURN UNIQUE PREVIEW LINK
+  const version = Date.now();
+  res.json({
+    ok: true,
+    preview: `https://lynex-editor.onrender.com/p/${version}`,
+    auto: `https://lynex-editor.onrender.com/demo.html?auto=1&v=${version}`
+  });
+});
+
+// NEW: UNIQUE SHARE LINKS
+app.get('/p/:v', (req,res)=>{
+  res.redirect(`/demo.html?auto=1&v=${req.params.v}`);
+});
+
+app.get('/preview', (req,res)=>{
+  res.redirect(`/demo.html?auto=1&v=${Date.now()}`);
 });
 
 app.get('/export/playable.zip', async (req, res) => {
@@ -81,69 +118,31 @@ app.get('/export/playable.zip', async (req, res) => {
   const zip = new JSZip();
   let html = fs.readFileSync('./public/demo.html', 'utf8');
   const js = fs.readFileSync('./public/playable.js', 'utf8');
-  
-  // INJECT THREE.JS FOR HIGH-END GRAPHICS
-  if(!html.includes('three.min.js')){
-    html = html.replace('</head>', `  <script src="https://unpkg.com/three@0.160.0/build/three.min.js"></script>\n</head>`);
-  }
-  
   zip.file('index.html', html);
   zip.file('playable.js', js);
-  const readme = `# Lynex 5D Playable\n\n## Intents\n- checkout: ${store[key(0,0,0,0.3,1)]}\n- init: ${store[key(1,0,0,0.3,1)]}\n- startGame: ${store[key(2,0,0,0.3,1)]}\n\nBuilt with Three.js WebGL support`;
+  const readme = `# Lynex 5D Playable\n\nBuilt ${new Date().toISOString()}`;
   zip.file('README.md', readme);
-  zip.file('mraid.js', '// MRAID stub for Facebook');
   const buf = await zip.generateAsync({ type: 'nodebuffer' });
-  res.set({
-    'Content-Type': 'application/zip',
-    'Content-Disposition': 'attachment; filename=lynex-playable.zip'
-  });
+  res.set({'Content-Type':'application/zip','Content-Disposition':'attachment; filename=lynex-playable.zip'});
   res.send(buf);
 });
 
 app.get('/map', (req, res) => {
-  let html = `<html><head><title>5D Map</title><style>body{background:#0b0f1a;color:#eee;font-family:system-ui;padding:20px}table{border-collapse:collapse;width:100%}td,th{border:1px solid #333;padding:6px;text-align:center}.filled{background:#1a7f37}</style></head><body><h1>5D Store Map</h1><table><tr><th>coordinate</th><th>preview</th></tr>`;
-  Object.keys(store).sort().forEach(k=>{
-    const val = store[k].substring(0,40).replace(/</g,'&lt;');
-    html += `<tr><td>${k}</td><td class="filled">${val}...</td></tr>`;
-  });
-  html += `</table></body></html>`;
+  let html = `<html><head><title>5D Map</title><style>body{background:#0b0f1a;color:#eee;font-family:system-ui;padding:20px}</style></head><body><h1>5D Store</h1></body></html>`;
   res.send(html);
 });
 
-// HIGH-END GRAPHICS PROJECTOR - UPGRADED
+// HIGH-END GRAPHICS PROJECTOR
 app.post('/api/generate', async (req, res) => {
   const { x, intent } = req.body;
   const names = ['checkout','init','startGame'];
   const fn = names[x] || 'fn';
   const OPENAI_KEY = process.env.OPENAI_API_KEY;
 
-  console.log('[5D] Generate:', { fn, intent, hasKey:!!OPENAI_KEY });
-
-  if (!OPENAI_KEY) {
-    const code = `function ${fn}(){\n console.log('No API key');\n ${fn==='checkout'?"setTimeout(()=>window.parent.postMessage('INSTALL_CLICK','*'),100);":''}\n}`;
-    return res.json({ code });
-  }
+  if (!OPENAI_KEY) return res.json({ code:`function ${fn}(){}` });
 
   try {
-    const systemPrompt = `You are a 5D code projector for Facebook playable ads. Write ONLY raw JavaScript - no markdown.
-
-GRAPHICS ENGINE: Three.js is ALREADY loaded via CDN. Use it.
-- Create: const scene=new THREE.Scene(), camera, renderer=new THREE.WebGLRenderer({antialias:true})
-- Append renderer.domElement to document.body
-- Use THREE.Points with BufferGeometry for particles (10,000+ particles @60fps)
-- Use MeshStandardMaterial with lights for 3D objects
-- For checkout(): MUST end with setTimeout(()=>window.parent.postMessage("INSTALL_CLICK","*"),2500)
-
-RULES:
-- Function name: ${fn} exactly
-- Max 80 lines, mobile GPU optimized
-- If Three.js fails, fallback to canvas 2D
-- Make it look premium: bloom, motion blur, depth`;
-
-    const userPrompt = `Intent: "${intent}"
-
-Generate ${fn}() using Three.js for best graphics. Create immersive effect. Return ONLY code.`;
-
+    const systemPrompt = `You are a 5D projector. Write ONLY JavaScript. Use Three.js (already loaded). Create scene, camera, renderer. Use Points for particles. For checkout(): end with setTimeout(()=>window.parent.postMessage("INSTALL_CLICK","*"),2500)`;
     const r = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: { 'Authorization': `Bearer ${OPENAI_KEY}`, 'Content-Type': 'application/json' },
@@ -151,36 +150,20 @@ Generate ${fn}() using Three.js for best graphics. Create immersive effect. Retu
         model: 'gpt-4o-mini',
         messages: [
           {role:'system', content: systemPrompt},
-          {role:'user', content: userPrompt}
+          {role:'user', content: `Intent: "${intent}". Generate ${fn}() with Three.js.`}
         ],
-        temperature: 0.8,
-        max_tokens: 1500
+        temperature: 0.8, max_tokens: 1500
       })
     });
-
-    if (!r.ok) {
-      const err = await r.text();
-      console.log('[5D] OpenAI error', r.status, err);
-      throw new Error(err);
-    }
-
     const data = await r.json();
-    let code = data.choices?.[0]?.message?.content || '';
-    code = code.replace(/```javascript|```js|```/g,'').trim();
-    if (!code.includes(`function ${fn}`)) {
-      code = `function ${fn}(){\n${code}\n}`;
+    let code = (data.choices?.[0]?.message?.content || '').replace(/```.*?```/gs,'').replace(/```/g,'').trim();
+    if (!code.includes(`function ${fn}`)) code = `function ${fn}(){\n${code}\n}`;
+    if(fn==='checkout' &&!code.includes('INSTALL_CLICK')){
+      code = code.replace(/}\s*$/, `\n setTimeout(()=>window.parent.postMessage("INSTALL_CLICK","*"),2500);\n}`);
     }
-    // Force INSTALL_CLICK for checkout
-    if(fn==='checkout' && !code.includes('INSTALL_CLICK')){
-      code = code.replace(/}\s*$/, `\n  setTimeout(()=>window.parent.postMessage("INSTALL_CLICK","*"),2500);\n}`);
-    }
-
-    console.log('[5D] LLM high-end code ok, bytes:', code.length);
     res.json({ code });
-
   } catch(e) {
-    console.log('[5D] LLM failed:', e.message);
-    res.json({ code: `function ${fn}(){ console.error('Generation failed'); }` });
+    res.json({ code: `function ${fn}(){}` });
   }
 });
 
