@@ -37,6 +37,7 @@ try { projectLog = JSON.parse(fs.readFileSync('./project-log.json', 'utf8')); } 
 // PROJECT ALL — Assembles 3D demo from Supabase 5D store
 // ============================================================
 async function projectAll(userId = DEV_SYSTEM_UUID) {
+  console.log(`[projectAll] Triggered compilation for user: ${userId}`);
   fs.mkdirSync('./public', { recursive: true });
 
   // Fetch the required executable coordinates from Supabase
@@ -47,18 +48,25 @@ async function projectAll(userId = DEV_SYSTEM_UUID) {
     key(0, 0, 0, 0.9, 0)  // checkout web
   ];
 
-  const { data: entries } = await supabase
+  console.log(`[projectAll] Querying coords:`, requiredCoords);
+
+  const { data: entries, error } = await supabase
     .from('store_entries')
     .select('coordinate, code')
     .eq('user_id', userId)
     .in('coordinate', requiredCoords);
 
-  const storeMap = {};
-  if (entries) {
-    entries.forEach(e => storeMap[e.coordinate] = e.code);
+  if (error) {
+    console.error(`[projectAll] Supabase error while reading coords:`, error.message);
   }
 
-  const playable = [0, 1, 2].map(x => storeMap[key(x, 0, 0, 0.9, 1)] || '').join('\n\n');
+  const storeMap = {};
+  if (entries) {
+    console.log(`[projectAll] Found ${entries.length} stored rows in DB.`);
+    entries.forEach(e => { storeMap[e.coordinate] = e.code; });
+  }
+
+  const playable = [0, 1, 2].map(x => storeMap[key(x, 0, 0, 0.9, 1)] || `// Empty fallback for slot ${x}`).join('\n\n');
   fs.writeFileSync('./public/playable.js', playable);
   fs.writeFileSync('./public/web.js', storeMap[key(0, 0, 0, 0.9, 0)] || '');
 
@@ -175,6 +183,7 @@ async function projectAll(userId = DEV_SYSTEM_UUID) {
 </html>`;
 
   fs.writeFileSync('./public/demo.html', demoHtml);
+  console.log(`[projectAll] demo.html file updated on filesystem.`);
 }
 // Run once on startup
 projectAll();
@@ -237,13 +246,16 @@ async function triggerRenderDeploy() {
 // ============================================================
 app.get('/api/project', async (req, res) => {
   const userId = req.query.user_id || DEV_SYSTEM_UUID; 
-  const coord = key(
-    parseInt(req.query.x) || 0,
-    parseInt(req.query.y) || 0,
-    parseInt(req.query.z) || 0,
-    parseFloat(req.query.w) || 0.9,
-    parseInt(req.query.v) || 0
-  );
+  
+  // Format variables explicitly into proper numbers
+  const px = parseInt(req.query.x, 10) || 0;
+  const py = parseInt(req.query.y, 10) || 0;
+  const pz = parseInt(req.query.z, 10) || 0;
+  const pw = parseFloat(req.query.w) || 0.9;
+  const pv = parseInt(req.query.v, 10) || 0;
+
+  const coord = key(px, py, pz, pw, pv);
+  console.log(`[GET /api/project] Request key: "${coord}" for user: ${userId}`);
 
   const { data, error } = await supabase
       .from('store_entries')
@@ -252,29 +264,51 @@ app.get('/api/project', async (req, res) => {
       .eq('coordinate', coord)
       .maybeSingle(); 
 
+  if (error) {
+    console.error(`[GET /api/project] Supabase error:`, error.message);
+    return res.status(500).json({ error: error.message, code: '// error reading database' });
+  }
+
   res.json({ code: data?.code || '// empty' });
 });
 
 app.post('/api/save', async (req, res) => {
+  console.log("--- INCOMING SAVE REQUEST ---");
   const { x, y, z, w, v, code, user_id = DEV_SYSTEM_UUID } = req.body;
-  const coord = key(x||0, y||0, z||0, w, v);
+  
+  // Enforce consistent formatting
+  const px = parseInt(x, 10) || 0;
+  const py = parseInt(y, 10) || 0;
+  const pz = parseInt(z, 10) || 0;
+  const pw = parseFloat(w) || 0.9;
+  const pv = parseInt(v, 10) || 0;
 
-  // Upsert to Supabase instead of store.json
+  const coord = key(px, py, pz, pw, pv);
+  console.log(`[POST /api/save] Target Coordinate string: "${coord}"`);
+
+  // Upsert to Supabase
   const { error } = await supabase
       .from('store_entries')
-      .upsert({ user_id, coordinate: coord, code, updated_at: new Date().toISOString() }, { onConflict: 'user_id, coordinate' });
+      .upsert({ 
+        user_id, 
+        coordinate: coord, 
+        code: code || '// empty code saved', 
+        updated_at: new Date().toISOString() 
+      }, { onConflict: 'user_id, coordinate' });
 
   if (error) {
+    console.error(`[POST /api/save] DB Upsert Failure:`, error.message);
     return res.status(500).json({ error: error.message });
   }
 
-  await projectAll(user_id); // Recompile the demo.html for this user
-  const version = Date.now();
+  console.log(`[POST /api/save] Successfully written to database.`);
+  await projectAll(user_id); // Recompile the static javascript assets
   
+  const version = Date.now();
   res.json({
     ok: true,
-    preview: `https://lynex-editor.onrender.com/p/${version}`,
-    auto: `https://lynex-editor.onrender.com/demo.html?auto=1&v=${version}`
+    preview: `/demo.html?auto=1&v=${version}`,
+    auto: `/demo.html?auto=1&v=${version}`
   });
 });
 
@@ -296,9 +330,16 @@ app.get('/export/playable.zip', async (req, res) => {
 // 3D SCENE GENERATOR
 // ============================================================
 app.post('/api/generate', async (req, res) => {
+  console.log("--- INCOMING GENERATE REQUEST ---");
   const { x, intent } = req.body;
-  const fn = ['checkout', 'init', 'startGame'][x] || 'fn';
+  const slotIndex = parseInt(x, 10) || 0;
+  const fn = ['checkout', 'init', 'startGame'][slotIndex] || 'fn';
   const OPENAI_KEY = process.env.OPENAI_API_KEY;
+
+  if (!OPENAI_KEY) {
+    console.error("Missing process.env.OPENAI_API_KEY environment variable!");
+    return res.status(500).json({ code: `function ${fn}(){ console.error('API key missing on server'); }` });
+  }
 
   const prompt = `Scene already has: scene, camera, renderer, composer (bloom), sun, controls, world (cannon-es physics), loader (GLTFLoader), makeParticles(), listener (audio), mixers[].
 Add: "${intent}". Use MeshStandardMaterial with roughness/metalness, castShadow=true. Position at y=0+. Do NOT recreate scene/camera. Return ONLY the inner JavaScript code. No markdown, no code fences, no explanation.`;
@@ -310,11 +351,20 @@ Add: "${intent}". Use MeshStandardMaterial with roughness/metalness, castShadow=
       body: JSON.stringify({ model: 'gpt-4o', messages: [{ role: 'user', content: prompt }], temperature: 0.75, max_tokens: 1400 })
     });
     const data = await r.json();
+    
+    if (data.error) {
+      console.error("OpenAI Endpoint Error: ", data.error);
+      return res.status(500).json({ error: data.error.message, code: `function ${fn}(){}` });
+    }
+
     let inner = (data.choices?.[0]?.message?.content || '')
       .replace(/```[\w]*/g, '').replace(/```/g, '').trim();
     const code = `function ${fn}(){\n${inner}\n${fn === 'checkout' ? "setTimeout(()=>window.parent.postMessage('INSTALL_CLICK','*'),2800);" : ""}\n}`;
+    
+    console.log("Generated clean code successfully.");
     res.json({ code });
   } catch(e) {
+    console.error("Failed executing AI generation handler:", e.message);
     res.json({ code: `function ${fn}(){}` });
   }
 });

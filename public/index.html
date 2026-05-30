@@ -7,80 +7,31 @@
 <style>
   * { box-sizing: border-box; }
   body { font-family: system-ui; background: #0b0f1a; color: #eee; margin: 0; padding: 16px; }
-
   h1 { font-size: 20px; margin: 0 0 4px; color: #fff; }
   .subtitle { font-size: 12px; color: #555; margin: 0 0 16px; letter-spacing: 0.05em; }
-
   .card { background: #151b2c; padding: 16px; border-radius: 12px; margin: 10px 0; }
-
   label { font-size: 12px; color: #888; display: block; margin-bottom: 4px; }
   select, input[type=range] { width: 100%; padding: 6px; background: #000; color: #fff; border: 1px solid #2a2f3e; border-radius: 6px; margin-top: 2px; font-size: 14px; }
-
   .row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 10px; }
   .slider-row { margin-top: 10px; }
   .slider-label { display: flex; justify-content: space-between; font-size: 12px; color: #888; }
   .slider-label span { color: #7c5cff; font-weight: 600; }
-
-  textarea {
-    width: 100%; height: 150px;
-    background: #000; color: #00e676;
-    border: 1px solid #2a2f3e; border-radius: 8px;
-    font-family: 'Courier New', monospace; font-size: 13px;
-    padding: 10px; resize: vertical; line-height: 1.5;
-  }
-  textarea::placeholder { color: #2a5a2a; }
-  textarea:focus { outline: none; border-color: #7c5cff; }
-
+  textarea { width: 100%; height: 150px; background: #000; color: #00e676; border: 1px solid #2a2f3e; border-radius: 8px; font-family: 'Courier New', monospace; font-size: 13px; padding: 10px; resize: vertical; line-height: 1.5; }
   .btn-row { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; align-items: center; }
-
-  button {
-    background: #7c5cff; border: none;
-    padding: 9px 16px; border-radius: 8px;
-    font-weight: 600; font-size: 14px; color: #fff;
-    cursor: pointer; transition: opacity 0.15s, background 0.15s;
-    white-space: nowrap;
-  }
-  button:hover { opacity: 0.85; }
-  button:disabled { opacity: 0.4; cursor: not-allowed; }
+  button { background: #7c5cff; border: none; padding: 9px 16px; border-radius: 8px; font-weight: 600; font-size: 14px; color: #fff; cursor: pointer; }
   button.green { background: #00a86b; }
   button.ghost { background: transparent; border: 1px solid #2a2f3e; color: #aaa; }
-  button.ghost:hover { border-color: #7c5cff; color: #fff; }
-
-  .status {
-    margin-top: 10px; font-size: 12px; padding: 8px 12px;
-    border-radius: 6px; display: none;
-  }
+  .status { margin-top: 10px; font-size: 12px; padding: 8px 12px; border-radius: 6px; display: none; }
   .status.loading { display: block; background: #1a1a2e; color: #7c5cff; border: 1px solid #2a1f5e; }
   .status.success { display: block; background: #002a00; color: #00e676; border: 1px solid #004400; }
   .status.error   { display: block; background: #2a0000; color: #ff5555; border: 1px solid #440000; }
-
-  .linkbox {
-    background: #002a10; border: 1px solid #00a86b;
-    padding: 10px 12px; border-radius: 8px; margin-top: 10px;
-    display: none; font-size: 13px;
-  }
+  .linkbox { background: #002a10; border: 1px solid #00a86b; padding: 10px 12px; border-radius: 8px; margin-top: 10px; display: none; font-size: 13px; }
   .linkbox a { color: #00e676; word-break: break-all; display: block; margin: 4px 0; }
-  .link-actions { display: flex; gap: 6px; margin-top: 6px; flex-wrap: wrap; }
-
-  pre {
-    white-space: pre-wrap; background: #000; color: #00e676;
-    padding: 10px; border-radius: 8px; font-family: 'Courier New', monospace;
-    font-size: 12px; max-height: 180px; overflow-y: auto; margin: 0 0 10px;
-    border: 1px solid #1a1a1a; line-height: 1.5;
-  }
-
-  .badge {
-    display: inline-block; font-size: 10px; padding: 2px 7px;
-    border-radius: 4px; margin-left: 6px; vertical-align: middle;
-    font-weight: 600; letter-spacing: 0.06em;
-  }
+  pre { white-space: pre-wrap; background: #000; color: #00e676; padding: 10px; border-radius: 8px; font-family: 'Courier New', monospace; font-size: 12px; max-height: 180px; overflow-y: auto; margin: 0 0 10px; border: 1px solid #1a1a1a; }
+  .badge { display: inline-block; font-size: 10px; padding: 2px 7px; border-radius: 4px; margin-left: 6px; font-weight: 600; }
   .badge.intent { background: #00a86b22; color: #00a86b; border: 1px solid #00a86b44; }
   .badge.code   { background: #7c5cff22; color: #7c5cff; border: 1px solid #7c5cff44; }
-
-  #mode-hint {
-    font-size: 12px; color: #555; margin-top: 6px; min-height: 16px;
-    transition: color 0.2s;
-  }
+  #mode-hint { font-size: 12px; color: #555; margin-top: 6px; }
 </style>
 </head>
 <body>
@@ -88,7 +39,6 @@
 <h1>Lynex 5D Editor</h1>
 <p class="subtitle">5D STORE → PROJECT → PLAYABLE</p>
 
-<!-- Coordinates -->
 <div class="card">
   <label>Function (x axis)</label>
   <select id="fn">
@@ -127,88 +77,53 @@
   <div id="mode-hint"></div>
 </div>
 
-<!-- Editor -->
 <div class="card">
-  <label>
-    Editor
-    <span id="mode-badge" class="badge code">CODE</span>
-  </label>
+  <label>Editor <span id="mode-badge" class="badge code">CODE</span></label>
   <textarea id="ed" placeholder="Loading..."></textarea>
 
   <div class="btn-row">
     <button id="save">Save to 5D</button>
     <button id="gen" class="green" style="display:none">⚡ Generate</button>
     <a href="/export/playable.zip"><button class="ghost">Export ZIP</button></a>
-    <a href="/map" target="_blank"><button class="ghost">5D Map</button></a>
   </div>
 
   <div id="status" class="status"></div>
-
   <div id="linkbox" class="linkbox">
     ✅ Preview ready
     <a id="link" target="_blank"></a>
-    <div class="link-actions">
-      <button onclick="copyLink()" style="padding:5px 10px;font-size:12px">Copy Link</button>
-      <button onclick="openLink()" style="padding:5px 10px;font-size:12px;background:#1a4a1a">Open Preview</button>
-    </div>
   </div>
 </div>
 
-<!-- Output / Run -->
 <div class="card">
   <label>Projected Output</label>
   <pre id="out">// output appears here</pre>
-  <button id="run" class="ghost" style="font-size:13px;padding:7px 14px">▶ Run in Console</button>
 </div>
 
 <script>
-  const fn   = document.getElementById('fn');
-  const y    = document.getElementById('y');
-  const z    = document.getElementById('z');
-  const w    = document.getElementById('w');
-  const v    = document.getElementById('v');
-  const ed   = document.getElementById('ed');
-  const out  = document.getElementById('out');
-  const wv   = document.getElementById('wv');
-  const vv   = document.getElementById('vv');
-  const gen  = document.getElementById('gen');
+  const fn = document.getElementById('fn');
+  const y = document.getElementById('y');
+  const z = document.getElementById('z');
+  const w = document.getElementById('w');
+  const v = document.getElementById('v');
+  const ed = document.getElementById('ed');
+  const out = document.getElementById('out');
+  const wv = document.getElementById('wv');
+  const vv = document.getElementById('vv');
+  const gen = document.getElementById('gen');
   const save = document.getElementById('save');
-  const statusEl  = document.getElementById('status');
-  const linkbox   = document.getElementById('linkbox');
-  const linkEl    = document.getElementById('link');
+  const statusEl = document.getElementById('status');
+  const linkbox = document.getElementById('linkbox');
+  const linkEl = document.getElementById('link');
   const modeBadge = document.getElementById('mode-badge');
-  const modeHint  = document.getElementById('mode-hint');
+  const modeHint = document.getElementById('mode-hint');
 
-  let lastUrl = '';
   let busy = false;
 
-  // --- Status helpers ---
   function setStatus(type, msg) {
     statusEl.className = 'status ' + type;
     statusEl.textContent = msg;
   }
-  function clearStatus() {
-    statusEl.className = 'status';
-    statusEl.textContent = '';
-  }
 
-  // --- Link helpers ---
-  function showLink(url) {
-    lastUrl = url;
-    linkEl.href = url;
-    linkEl.textContent = url;
-    linkbox.style.display = 'block';
-  }
-  function copyLink() {
-    navigator.clipboard.writeText(lastUrl);
-    setStatus('success', '✅ Link copied to clipboard!');
-    setTimeout(clearStatus, 2000);
-  }
-  function openLink() {
-    window.open(lastUrl, '_blank');
-  }
-
-  // --- Mode display ---
   function updateMode() {
     const isIntent = w.value === '0.3';
     wv.textContent = w.value;
@@ -218,107 +133,113 @@
       gen.style.display = 'inline-block';
       modeBadge.className = 'badge intent';
       modeBadge.textContent = 'INTENT';
-      ed.placeholder = 'Describe what you want — e.g. "make fire on the ground"\nThen click ⚡ Generate';
-      modeHint.textContent = 'Intent mode: describe the scene you want, then click Generate.';
+      modeHint.textContent = 'Intent mode: describe your changes, then click Generate.';
       modeHint.style.color = '#00a86b';
     } else {
       gen.style.display = 'none';
       modeBadge.className = 'badge code';
       modeBadge.textContent = 'CODE';
-      ed.placeholder = '// JavaScript code';
-      modeHint.textContent = 'Code mode: edit directly, then click Save to 5D.';
+      modeHint.textContent = 'Code mode: direct script editor.';
       modeHint.style.color = '#555';
     }
   }
 
-  // --- Lock/unlock UI during async ops ---
-  function setbusy(state) {
-    busy = state;
-    save.disabled = state;
-    gen.disabled  = state;
-  }
-
-  // --- Project (load from store) ---
   async function proj() {
     updateMode();
     try {
-      const r = await fetch(`/api/project?x=${fn.value}&y=${y.value}&z=${z.value}&w=${w.value}&v=${v.value}`);
+      const url = `/api/project?x=${fn.value}&y=${y.value}&z=${z.value}&w=${w.value}&v=${v.value}&t=${Date.now()}`;
+      const r = await fetch(url);
       const d = await r.json();
       ed.value = d.code;
       out.textContent = d.code;
     } catch(e) {
-      setStatus('error', '❌ Could not load from store: ' + e.message);
+      setStatus('error', '❌ Could not load: ' + e.message);
     }
   }
 
-  // --- Save ---
   async function doSave() {
     if (busy) return;
-    setbusy(true);
-    setStatus('loading', '⏳ Saving to 5D store...');
-    linkbox.style.display = 'none';
+    busy = true;
+    setStatus('loading', '⏳ Saving...');
     try {
       const r = await fetch('/api/save', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ x: +fn.value, y: +y.value, z: +z.value, w: +w.value, v: +v.value, code: ed.value })
+        body: JSON.stringify({ 
+          x: parseInt(fn.value), 
+          y: parseInt(y.value), 
+          z: parseInt(z.value), 
+          w: parseFloat(w.value), 
+          v: parseInt(v.value), 
+          code: ed.value 
+        })
       });
       const data = await r.json();
       await proj();
-      setStatus('success', '✅ Saved! demo.html rebuilt.');
-      if (data.preview) showLink(data.preview);
+      setStatus('success', '✅ Saved to 5D database!');
+      if (data.preview) {
+        linkEl.href = data.preview;
+        linkEl.textContent = window.location.origin + data.preview;
+        linkbox.style.display = 'block';
+      }
     } catch(e) {
       setStatus('error', '❌ Save failed: ' + e.message);
     } finally {
-      setbusy(false);
+      busy = false;
     }
   }
 
-  // --- Generate from Intent ---
   async function doGenerate() {
     if (busy) return;
     const intent = ed.value.trim();
-    if (!intent) { setStatus('error', '❌ Write your intent in the editor first.'); return; }
-    setbusy(true);
-    setStatus('loading', '⏳ Generating 3D code from intent...');
-    linkbox.style.display = 'none';
+    if (!intent) { setStatus('error', '❌ Please type an intent first.'); return; }
+    busy = true;
+    setStatus('loading', '⚡ Compiling intent via OpenAI...');
     try {
       const r = await fetch('/api/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ x: +fn.value, intent })
+        body: JSON.stringify({ x: parseInt(fn.value), intent })
       });
       const d = await r.json();
 
-      // Auto-save the generated code at w=0.9
+      // Ensure sliders move to production parameters for playable compilation
       w.value = '0.9';
+      v.value = '1';
+      
       const s = await fetch('/api/save', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ x: +fn.value, y: +y.value, z: +z.value, w: 0.9, v: +v.value, code: d.code })
+        body: JSON.stringify({ 
+          x: parseInt(fn.value), 
+          y: parseInt(y.value), 
+          z: parseInt(z.value), 
+          w: 0.9, 
+          v: 1, 
+          code: d.code 
+        })
       });
       const data = await s.json();
       await proj();
-      setStatus('success', '✅ Generated and saved!');
-      if (data.preview) showLink(data.preview);
+      setStatus('success', '✅ Generated, saved, and built!');
+      if (data.preview) {
+        linkEl.href = data.preview;
+        linkEl.textContent = window.location.origin + data.preview;
+        linkbox.style.display = 'block';
+      }
     } catch(e) {
-      setStatus('error', '❌ Generate failed: ' + e.message);
+      setStatus('error', '❌ Generation failed: ' + e.message);
     } finally {
-      setbusy(false);
+      busy = false;
     }
   }
 
-  // --- Event listeners ---
   save.onclick = doSave;
-  gen.onclick  = doGenerate;
-  document.getElementById('run').onclick = () => {
-    try { eval(out.textContent); }
-    catch(e) { setStatus('error', '❌ Runtime error: ' + e.message); }
-  };
+  gen.onclick = doGenerate;
   fn.onchange = y.onchange = z.onchange = proj;
-  w.oninput   = v.oninput  = proj;
+  w.oninput = v.oninput = proj;
 
-  // Init
+  // Initial load
   proj();
 </script>
 </body>
