@@ -18,18 +18,16 @@ app.use(cors());
 app.use(express.json({ limit: '20mb' }));
 app.use(express.static('public'));
 
-// --- 5D STORE (your fire game) ---
+// --- 5D STORE ---
 const DEFAULTS = {
   "0,0,0,0.9,0": "function checkout(){ console.log('web'); }",
   "0,0,0,0.9,1": "function checkout(){ window.parent.postMessage('INSTALL_CLICK','*'); }",
   "1,0,0,0.9,1": "function init(){ window.gameState={taps:0,fireScale:0.5}; }",
   "2,0,0,0.9,1": "function startGame(){ scene.children.filter(c=>c.userData?.fire).forEach(c=>scene.remove(c)); const fireGroup=new THREE.Group();fireGroup.userData.fire=true;fireGroup.userData.scale=0.5; const createParticle=()=>{const geo=new THREE.SphereGeometry(0.06,8,8);const mat=new THREE.MeshBasicMaterial({color:new THREE.Color().setHSL(0.07-Math.random()*0.04,1,0.6),transparent:true,opacity:0.9});const p=new THREE.Mesh(geo,mat);p.position.set((Math.random()-0.5)*fireGroup.userData.scale,(Math.random()-0.3)*0.2,(Math.random()-0.5)*fireGroup.userData.scale);p.userData={vy:0.012+Math.random()*0.018,life:0};return p;};for(let i=0;i<60;i++)fireGroup.add(createParticle());scene.add(fireGroup);const light=new THREE.PointLight(0xff5500,2,6);light.position.set(0,0.6,0);light.userData.fire=true;scene.add(light);let growInterval=setInterval(()=>{if(fireGroup.userData.scale<2.2){fireGroup.userData.scale+=0.15;fireGroup.children.forEach(p=>{if(Math.random()<0.3)fireGroup.add(createParticle())});light.intensity=1.8+fireGroup.userData.scale*0.4;}else clearInterval(growInterval);},800);const tapHandler=()=>{const taps=++window.gameState.taps;fireGroup.userData.scale=Math.max(0.3,fireGroup.userData.scale-0.4);fireGroup.children.slice(0,15).forEach(p=>{p.material.opacity*=0.5;p.userData.vy*=1.5});if(taps>=3){clearInterval(growInterval);renderer.domElement.removeEventListener('pointerdown',tapHandler);setTimeout(()=>checkout(),400);}};renderer.domElement.addEventListener('pointerdown',tapHandler);const animate=()=>{fireGroup.children.forEach(p=>{p.position.y+=p.userData.vy;p.userData.life+=0.015;p.material.opacity=Math.max(0,0.9-p.userData.life*0.4);p.scale.setScalar(1+p.userData.life*0.3);if(p.position.y>2.2||p.material.opacity<=0){p.position.y=0;p.position.set((Math.random()-0.5)*fireGroup.userData.scale,0,(Math.random()-0.5)*fireGroup.userData.scale);p.userData.life=0;p.material.opacity=0.9;}});light.intensity=1.5+Math.sin(Date.now()*0.008)*0.6+fireGroup.userData.scale*0.3;requestAnimationFrame(animate);};animate(); }",
 };
-
 let store = {...DEFAULTS };
 try { store = {...store,...JSON.parse(fs.readFileSync('./store.json', 'utf8')) }; } catch {}
 Object.keys(DEFAULTS).forEach(k => store[k] = DEFAULTS[k]);
-
 const key = (x, y, z, w, v) => `${x},${y},${z},${w},${v}`;
 
 function projectAll() {
@@ -37,27 +35,20 @@ function projectAll() {
   const playable = [0, 1, 2].map(x => store[key(x, 0, 0, 0.9, 1)] || '').join('\n\n');
   fs.writeFileSync('./public/playable.js', playable);
   fs.writeFileSync('./public/web.js', store[key(0, 0, 0, 0.9, 0)] || '');
-
-  const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Lynex 5D</title><style>body{margin:0;background:#000;overflow:hidden}canvas{display:block}#cta{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.85);z-index:9}#btn{padding:18px 36px;font-size:20px;background:#7c5cff;color:#fff;border:0;border-radius:12px}</style></head><body><div id=cta><button id=btn>TAP TO EXTINGUISH</button></div><script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/0.145.0/three.min.js"></script><script>window.scene=new THREE.Scene();window.camera=new THREE.PerspectiveCamera(65,innerWidth/innerHeight,0.1,100);camera.position.set(0,1.4,3.2);window.renderer=new THREE.WebGLRenderer({antialias:true});renderer.setSize(innerWidth,innerHeight);document.body.appendChild(renderer.domElement);function loop(){requestAnimationFrame(loop);renderer.render(scene,camera)}loop();const s=document.createElement('script');s.src='/playable.js?v='+Date.now();s.onload=()=>{try{init()}catch(e){}};document.body.appendChild(s);btn.onclick=()=>{cta.style.display='none';try{startGame()}catch(e){}};</script></body></html>`;
+  const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Lynex 5D</title><style>body{margin:0;background:#000;overflow:hidden}canvas{display:block}#cta{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.85)}#btn{padding:18px 36px;font-size:20px;background:#7c5cff;color:#fff;border:0;border-radius:12px}</style></head><body><div id=cta><button id=btn>TAP</button></div><script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/0.145.0/three.min.js"></script><script>window.scene=new THREE.Scene();window.camera=new THREE.PerspectiveCamera(65,innerWidth/innerHeight,0.1,100);camera.position.set(0,1.4,3.2);window.renderer=new THREE.WebGLRenderer({antialias:true});renderer.setSize(innerWidth,innerHeight);document.body.appendChild(renderer.domElement);function loop(){requestAnimationFrame(loop);renderer.render(scene,camera)}loop();const s=document.createElement('script');s.src='/playable.js?v='+Date.now();s.onload=()=>{try{init()}catch(e){}};document.body.appendChild(s);btn.onclick=()=>{cta.style.display='none';try{startGame()}catch(e){}};</script></body></html>`;
   fs.writeFileSync('./public/demo.html', html);
 }
 projectAll();
 
-// --- GitHub helpers ---
 async function ghGet(path) {
   const { data } = await octokit.repos.getContent({ owner: REPO_OWNER, repo: REPO_NAME, path, ref: BRANCH });
   return { code: Buffer.from(data.content, 'base64').toString('utf8'), sha: data.sha };
 }
 async function ghPut(path, code, sha, msg) {
-  await octokit.repos.createOrUpdateFileContents({
-    owner: REPO_OWNER, repo: REPO_NAME, path, branch: BRANCH,
-    message: msg || `Update ${path}`,
-    content: Buffer.from(code).toString('base64'), sha
-  });
+  await octokit.repos.createOrUpdateFileContents({ owner: REPO_OWNER, repo: REPO_NAME, path, branch: BRANCH, message: msg || `Update ${path}`, content: Buffer.from(code).toString('base64'), sha });
 }
 
-// --- Core API ---
-app.get('/health', (_, res) => res.json({ ok: true, version: '5d-chat', uptime: process.uptime() }));
+app.get('/health', (_, res) => res.json({ ok: true, version: '5d-full', uptime: process.uptime() }));
 
 app.get('/api/project', (req, res) => {
   const { x=0, y=0, z=0, w=0.9, v=0 } = req.query;
@@ -72,7 +63,6 @@ app.post('/api/save', async (req, res) => {
   res.json({ ok: true });
 });
 
-// --- GitHub ---
 app.get('/api/github/read', async (req, res) => {
   try { res.json(await ghGet(req.query.path || 'server.js')); }
   catch (e) { res.status(500).json({ error: e.message }); }
@@ -81,64 +71,70 @@ app.get('/api/github/read', async (req, res) => {
 app.post('/api/github/write', async (req, res) => {
   try {
     const { path, code, sha, message } = req.body;
-    if (path === 'server.js') {
-      try { const old = await ghGet(path); await ghPut(`backups/${Date.now()}-server.js`, old.code, null, 'backup'); } catch {}
-    }
+    if (path === 'server.js') { try { const old = await ghGet(path); await ghPut(`backups/${Date.now()}-server.js`, old.code, null, 'backup'); } catch {} }
     await ghPut(path, code, sha, message);
     res.json({ ok: true });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-// --- AUTO PUSH (no SHA) ---
 app.post('/api/push', async (req, res) => {
   try {
     const { path, code, message } = req.body;
     const ex = await ghGet(path).catch(() => ({ sha: null }));
-    await ghPut(path, code, ex.sha, message || 'lynex auto');
+    await ghPut(path, code, ex.sha, message || 'auto-push');
     res.json({ ok: true });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-// --- AGENT ---
 app.post('/api/agent/execute', async (req, res) => {
   try {
-    const { action, path, code, message } = req.body;
-    if (action === 'read_file') {
-      const f = await ghGet(path); return res.json({ success: true, content: f.code });
+    const { action, path, code, find, message } = req.body;
+    const file = await ghGet(path).catch(() => ({ code: '', sha: null }));
+
+    if (action === 'read_file') return res.json({ success: true, content: file.code });
+    if (action === 'write_file') { await ghPut(path, code, file.sha, message); return res.json({ success: true }); }
+    if (action === 'insert_after') {
+      const idx = file.code.indexOf(find);
+      if (idx === -1) return res.json({ success: false, error: 'not found' });
+      const updated = file.code.slice(0, idx + find.length) + '\n' + code + file.code.slice(idx + find.length);
+      await ghPut(path, updated, file.sha, message); return res.json({ success: true });
     }
-    if (action === 'write_file') {
-      const ex = await ghGet(path).catch(() => ({ sha: null }));
-      await ghPut(path, code, ex.sha, message || 'Agent');
-      return res.json({ success: true });
+    if (action === 'smart_edit') {
+      const prompt = `You are editing ${path}. Current code:\n${file.code}\n\nTask: ${message}\nReturn ONLY the full updated file, no explanations.`;
+      const r = await fetch('https://api.openai.com/v1/chat/completions', { method: 'POST', headers: { Authorization: `Bearer ${OPENAI_KEY}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ model: 'gpt-4o-mini', messages: [{ role: 'user', content: prompt }], temperature: 0 }) });
+      const d = await r.json(); const newCode = d.choices[0].message.content.replace(/```\w*\n|```/g, '');
+      await ghPut(path, newCode, file.sha, 'Smart: ' + message); return res.json({ success: true });
     }
-    if (action === 'get_status') {
-      const c = await octokit.repos.listCommits({ owner: REPO_OWNER, repo: REPO_NAME, per_page: 3 });
-      return res.json({ success: true, commits: c.data.map(x => x.commit.message) });
-    }
+    if (action === 'get_status') { const c = await octokit.repos.listCommits({ owner: REPO_OWNER, repo: REPO_NAME, per_page: 3 }); return res.json({ success: true, commits: c.data.map(x => x.commit.message) }); }
     res.json({ success: false });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-// --- CHAT INSIDE LYNEX ---
 app.get('/chat', (_, res) => {
-  res.send(`<!DOCTYPE html><html><head><meta name=viewport content="width=device-width,initial-scale=1"><title>Lynex Chat</title><style>body{margin:0;background:#0b0b12;color:#fff;font-family:system-ui;display:flex;flex-direction:column;height:100vh}#log{flex:1;overflow:auto;padding:12px}#in{display:flex;padding:10px;background:#111}input{flex:1;padding:12px;border:0;border-radius:8px;background:#222;color:#fff}button{margin-left:8px;padding:12px;background:#7c5cff;border:0;border-radius:8px;color:#fff}.m{margin:8px 0;padding:8px 12px;border-radius:8px;max-width:85%}.u{background:#1e1e2e;margin-left:auto}.a{background:#222}</style></head><body><div id=log></div><div id=in><input id=q placeholder="Ask Lynex to code..."><button onclick=send()>Send</button></div><script>const log=document.getElementById('log');let h=[];async function send(){const v=q.value;if(!v)return;q.value='';add(v,'u');h.push({role:'user',content:v});const r=await fetch('/api/chat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({messages:h})}).then(r=>r.json());add(r.reply,'a');h.push({role:'assistant',content:r.reply});if(r.reply.includes('{"tool"')){try{const j=JSON.parse(r.reply.match(/{[^}]+}/)[0].replace(/\\n/g,'\\\\n'));if(j.tool==='write_file'){await fetch('/api/agent/execute',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'write_file',path:j.path,code:j.code})});add('✓ Wrote '+j.path,'a')}}catch{}}}function add(t,c){const d=document.createElement('div');d.className='m '+c;d.textContent=t;log.appendChild(d);log.scrollTop=1e9}</script></body></html>`);
+  res.send(`<!DOCTYPE html><html><head><meta name=viewport content="width=device-width,initial-scale=1"><title>Lynex Chat</title><style>body{margin:0;background:#0b0b12;color:#fff;font-family:system-ui;display:flex;flex-direction:column;height:100vh}#log{flex:1;overflow:auto;padding:12px}#in{display:flex;padding:10px;background:#111}input{flex:1;padding:12px;border:0;border-radius:8px;background:#222;color:#fff}button{margin-left:8px;padding:12px 16px;background:#7c5cff;border:0;border-radius:8px;color:#fff}.m{margin:8px 0;padding:8px 12px;border-radius:8px;max-width:85%}.u{background:#1e1e2e;margin-left:auto}.a{background:#222}</style></head><body><div id=log></div><div id=in><input id=q placeholder="Ask to code..."><button onclick=send()>Send</button></div><script>const log=document.getElementById('log');let h=[];async function send(){const v=q.value;if(!v)return;q.value='';add(v,'u');h.push({role:'user',content:v});const r=await fetch('/api/chat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({messages:h})}).then(r=>r.json());add(r.reply,'a');h.push({role:'assistant',content:r.reply})}function add(t,c){const d=document.createElement('div');d.className='m '+c;d.textContent=t;log.appendChild(d);log.scrollTop=1e9}</script></body></html>`);
 });
 
 app.post('/api/chat', async (req, res) => {
-  if (!OPENAI_KEY) return res.json({ reply: 'Add OPENAI_API_KEY in Render' });
+  if (!OPENAI_KEY) return res.json({ reply: 'Set OPENAI_API_KEY' });
   try {
-    const r = await fetch('https://api.openai.com/v1/chat/completions', {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${OPENAI_KEY}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        model: 'gpt-4o-mini',
-        messages: [{ role: 'system', content: 'You are Lynex. If user asks to make a file, reply ONLY with JSON {"tool":"write_file","path":"name.js","code":"..."}. Otherwise chat normally.' },...req.body.messages.slice(-8)],
-        temperature: 0.3
-      })
-    });
-    const d = await r.json();
-    res.json({ reply: d.choices[0].message.content });
+    const userMsg = req.body.messages[req.body.messages.length-1].content;
+    if (userMsg.match(/server\.js|add|create|edit|route/i)) {
+      await fetch(`https://lynex-editor.onrender.com/api/agent/execute`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'smart_edit', path: 'server.js', message: userMsg }) });
+      return res.json({ reply: 'Done. I read server.js, made the change, and pushed it. Wait 60s then refresh.' });
+    }
+    const r = await fetch('https://api.openai.com/v1/chat/completions', { method: 'POST', headers: { Authorization: `Bearer ${OPENAI_KEY}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ model: 'gpt-4o-mini', messages: [{ role: 'system', content: 'You are Lynex coding assistant.' },...req.body.messages.slice(-6)], temperature: 0.4 }) });
+    const d = await r.json(); res.json({ reply: d.choices[0].message.content });
   } catch (e) { res.json({ reply: 'Error: ' + e.message }); }
 });
 
-app.listen(PORT, () => console.log('Lynex 5D Chat running'));
+app.post('/api/ai/generate', async (req, res) => {
+  if (!OPENAI_KEY) return res.json({ code: '// no key' });
+  const { prompt, x=2 } = req.body; const fn = ['checkout','init','startGame'][x];
+  try { const r = await fetch('https://api.openai.com/v1/chat/completions', { method: 'POST', headers: { Authorization: `Bearer ${OPENAI_KEY}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ model: 'gpt-4o', messages: [{ role: 'system', content: 'Return only JS inside function' }, { role: 'user', content: prompt }], temperature: 0.8 }) }); const d = await r.json(); let inner = (d.choices[0]?.message?.content || '').replace(/```.*?\n|```/gs, ''); res.json({ code: `function ${fn}(){${inner}}` }); } catch { res.json({ code: `function ${fn}(){}` }); }
+});
+
+app.get('/export/playable.zip', async (_, res) => {
+  projectAll(); const zip = new JSZip(); zip.file('index.html', fs.readFileSync('./public/demo.html')); zip.file('playable.js', fs.readFileSync('./public/playable.js')); res.set('Content-Type', 'application/zip').send(await zip.generateAsync({ type: 'nodebuffer' }));
+});
+
+app.listen(PORT, () => console.log('Lynex running on ' + PORT));
