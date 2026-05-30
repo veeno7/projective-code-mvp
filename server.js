@@ -79,11 +79,17 @@ app.post('/api/save', async (req, res) => {
 app.get('/export/playable.zip', async (req, res) => {
   projectAll();
   const zip = new JSZip();
-  const html = fs.readFileSync('./public/demo.html', 'utf8');
+  let html = fs.readFileSync('./public/demo.html', 'utf8');
   const js = fs.readFileSync('./public/playable.js', 'utf8');
+  
+  // INJECT THREE.JS FOR HIGH-END GRAPHICS
+  if(!html.includes('three.min.js')){
+    html = html.replace('</head>', `  <script src="https://unpkg.com/three@0.160.0/build/three.min.js"></script>\n</head>`);
+  }
+  
   zip.file('index.html', html);
   zip.file('playable.js', js);
-  const readme = `# Lynex 5D Playable\n\n## Intents\n- checkout: ${store[key(0,0,0,0.3,1)]}\n- init: ${store[key(1,0,0,0.3,1)]}\n- startGame: ${store[key(2,0,0,0.3,1)]}\n`;
+  const readme = `# Lynex 5D Playable\n\n## Intents\n- checkout: ${store[key(0,0,0,0.3,1)]}\n- init: ${store[key(1,0,0,0.3,1)]}\n- startGame: ${store[key(2,0,0,0.3,1)]}\n\nBuilt with Three.js WebGL support`;
   zip.file('README.md', readme);
   zip.file('mraid.js', '// MRAID stub for Facebook');
   const buf = await zip.generateAsync({ type: 'nodebuffer' });
@@ -104,7 +110,7 @@ app.get('/map', (req, res) => {
   res.send(html);
 });
 
-// UPGRADED GAME PROJECTOR
+// HIGH-END GRAPHICS PROJECTOR - UPGRADED
 app.post('/api/generate', async (req, res) => {
   const { x, intent } = req.body;
   const names = ['checkout','init','startGame'];
@@ -119,20 +125,24 @@ app.post('/api/generate', async (req, res) => {
   }
 
   try {
-    const systemPrompt = `You are a 5D code projector for Facebook playable ads. Write ONLY raw JavaScript - no markdown, no explanations.
+    const systemPrompt = `You are a 5D code projector for Facebook playable ads. Write ONLY raw JavaScript - no markdown.
+
+GRAPHICS ENGINE: Three.js is ALREADY loaded via CDN. Use it.
+- Create: const scene=new THREE.Scene(), camera, renderer=new THREE.WebGLRenderer({antialias:true})
+- Append renderer.domElement to document.body
+- Use THREE.Points with BufferGeometry for particles (10,000+ particles @60fps)
+- Use MeshStandardMaterial with lights for 3D objects
+- For checkout(): MUST end with setTimeout(()=>window.parent.postMessage("INSTALL_CLICK","*"),2500)
 
 RULES:
-- Function name must be exactly: ${fn}
-- For checkout(): MUST call window.parent.postMessage("INSTALL_CLICK","*") within 100ms of visual effect ending
-- For init(): setup canvas, preload, create game objects
-- For startGame(): create full game loop with requestAnimationFrame
-- Use vanilla JS only, create canvas dynamically if needed
-- Add real visuals: particles, tweens, physics matching the intent
-- Max 50 lines, must be runnable immediately`;
+- Function name: ${fn} exactly
+- Max 80 lines, mobile GPU optimized
+- If Three.js fails, fallback to canvas 2D
+- Make it look premium: bloom, motion blur, depth`;
 
     const userPrompt = `Intent: "${intent}"
 
-Generate complete ${fn}() that implements this as a real playable effect. If intent mentions confetti, explosion, bounce, etc., code the actual animation. Return ONLY the function code.`;
+Generate ${fn}() using Three.js for best graphics. Create immersive effect. Return ONLY code.`;
 
     const r = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
@@ -143,8 +153,8 @@ Generate complete ${fn}() that implements this as a real playable effect. If int
           {role:'system', content: systemPrompt},
           {role:'user', content: userPrompt}
         ],
-        temperature: 0.7,
-        max_tokens: 1200
+        temperature: 0.8,
+        max_tokens: 1500
       })
     });
 
@@ -160,8 +170,12 @@ Generate complete ${fn}() that implements this as a real playable effect. If int
     if (!code.includes(`function ${fn}`)) {
       code = `function ${fn}(){\n${code}\n}`;
     }
+    // Force INSTALL_CLICK for checkout
+    if(fn==='checkout' && !code.includes('INSTALL_CLICK')){
+      code = code.replace(/}\s*$/, `\n  setTimeout(()=>window.parent.postMessage("INSTALL_CLICK","*"),2500);\n}`);
+    }
 
-    console.log('[5D] LLM game code ok, bytes:', code.length);
+    console.log('[5D] LLM high-end code ok, bytes:', code.length);
     res.json({ code });
 
   } catch(e) {
@@ -170,4 +184,4 @@ Generate complete ${fn}() that implements this as a real playable effect. If int
   }
 });
 
-app.listen(PORT, () => console.log('Lynex 5D running'));
+app.listen(PORT, () => console.log('Lynex 5D running - HIGH END'));
