@@ -69,9 +69,8 @@ function projectAll() {
 <body>
 <div id="cta"><h1>Lynex 5D</h1><button onclick="play()">Play Now</button></div>
 <div id="err"></div>
-<!-- Only two guaranteed CDN deps: Three.js core + cannon-es -->
+<!-- Single dependency: Three.js core only, zero addons -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/cannon-es@0.20.0/dist/cannon-es.js"></script>
 <script>
   window.onerror=function(msg,src,line){var e=document.getElementById('err');e.style.display='block';e.textContent+='ERROR: '+msg+'\\n'+(src||'')+':'+line+'\\n\\n';};
 
@@ -110,10 +109,9 @@ function projectAll() {
   );
   ground.rotation.x=-Math.PI/2;ground.receiveShadow=true;scene.add(ground);
 
-  // Physics
-  window.world=new CANNON.World({gravity:new CANNON.Vec3(0,-9.82,0)});
-  var gb=new CANNON.Body({type:CANNON.Body.STATIC,shape:new CANNON.Plane()});
-  gb.quaternion.setFromEuler(-Math.PI/2,0,0);world.addBody(gb);
+  // Physics stub - no external dependency
+  window.world={step:function(){},addBody:function(){}};
+  window.CANNON={};
 
   // Helpers for generated code
   window.mixers=[];
@@ -135,7 +133,7 @@ function projectAll() {
     t+=0.0015;
     sun.position.x=Math.cos(t)*9;
     sun.position.z=Math.sin(t)*9;
-    try{world.step(1/60,clock.getDelta(),3);}catch(e){}
+    try{world.step(1/60);}catch(e){}
     mixers.forEach(function(m){try{m.update(0.016);}catch(e){}});
     renderer.render(scene,camera);
   }
